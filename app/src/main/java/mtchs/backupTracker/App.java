@@ -8,6 +8,6 @@ import mtchs.backupTracker.backupEngine.BackupEngine;
 public class App {
     public static void main(String[] args) {
         BackupEngine backupEngine = new BackupEngine();
-        backupEngine.backup("C:/sourceFolder", "C:/destinationFolder");
+        backupEngine.replaceFile("C:\\sourceFolder\\ptso.jpg", "C:\\destinationFolder\\sourceFolder_backup_1775074752873\\ptso.jpg");
     }
 }
