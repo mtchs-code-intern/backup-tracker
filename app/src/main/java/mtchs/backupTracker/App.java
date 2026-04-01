@@ -3,12 +3,11 @@
  */
 package mtchs.backupTracker;
 
-public class App {
-    public String getGreeting() {
-        return "Hello World!";
-    }
+import mtchs.backupTracker.backupEngine.BackupEngine;
 
+public class App {
     public static void main(String[] args) {
-        System.out.println(new App().getGreeting());
+        BackupEngine backupEngine = new BackupEngine();
+        backupEngine.backup("C:/sourceFolder", "C:/destinationFolder");
     }
 }
