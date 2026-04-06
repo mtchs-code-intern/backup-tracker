@@ -44,6 +44,27 @@ public class LocalTracker {
     }
 
     /**
+     * Tracks a folder by recursively tracking all files within the folder and its subfolders.
+     * @param folder The folder to be tracked.
+     */
+    public void trackFolder(File folder) {
+        if (folder.isDirectory()) {
+            File[] files = folder.listFiles();
+            if (files != null) {
+                for (File file : files) {
+                    if (file.isFile()) {
+                        trackFile(file);
+                    } else if (file.isDirectory()) {
+                        trackFolder(file);
+                    }
+                }
+            }
+        } else {
+            System.out.println("Provided file is not a directory: " + folder.getAbsolutePath());
+        }
+    }
+
+    /**
      * Tracks a file by storing its name, location, and hash in a JSON file.
      * 
      * @param file The file to be tracked.
@@ -101,6 +122,11 @@ public class LocalTracker {
         }
     }
 
+    /**
+     * Untracks a file by removing its entry from the JSON file.
+     * 
+     * @param file The file to be untracked.
+     */
     public void untrackFile(File file) {
         try {
             if (!Files.exists(JSON_FILE)) {
@@ -128,5 +154,10 @@ public class LocalTracker {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    public void updateFile(File file) {
+        untrackFile(file);
+        trackFile(file);
     }
 }

@@ -8,10 +8,37 @@ import java.io.File;
 import mtchs.backupTracker.backupEngine.BackupEngine;
 import mtchs.backupTracker.backupEngine.FileHasher;
 
+/**
+ * App is the main entry point for the Backup Tracker application. It currently only supports a version flag to display the application version.
+ * 
+ * @author Carsen Gafford
+ * @version 0.0.3
+ * @since 04-06-2026
+ */
 public class App {
     public static void main(String[] args) {
-        LocalTracker tracker = new LocalTracker();
-        File fileToTrack = new File("example.txt");
-        tracker.trackFile(fileToTrack);
+        
+        if (args.length == 0) {
+            System.out.println("No arguments provided");
+        }
+        
+        if (args[0].equals("-v") && args.length == 1) {
+            System.out.println("Backup Tracker Version 0.0.3");
+        } else if (args[0].equals("-track") && args.length == 3) {
+            BackupEngine backupEngine = new BackupEngine();
+            LocalTracker tracker = new LocalTracker();
+            File fileToTrack = new File(args[1]);
+
+            if (fileToTrack.isDirectory()) {
+                tracker.trackFolder(fileToTrack);
+            } else if (fileToTrack.isFile()) {
+                tracker.trackFile(fileToTrack);
+            }
+            backupEngine.backup(args[1], args[2]);
+
+            System.out.println("File/Folder tracked and backed up successfully");
+        } else if (args[0].equals("-update") && args.length == 1) {
+            // TODO: Implement update functionality
+        }
     }
 }
