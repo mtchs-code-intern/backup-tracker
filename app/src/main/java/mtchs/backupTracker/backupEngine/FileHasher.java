@@ -1,5 +1,6 @@
 package mtchs.backupTracker.backupEngine;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -54,5 +55,9 @@ public class FileHasher {
             hashString.append(String.format("%02x", b));
         }
         return hashString.toString();
+    }
+
+    public String hashFile(File file) {
+        return hashFile(file.getAbsolutePath());
     }
 }

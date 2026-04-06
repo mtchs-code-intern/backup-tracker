@@ -10,9 +10,8 @@ import mtchs.backupTracker.backupEngine.FileHasher;
 
 public class App {
     public static void main(String[] args) {
-        FileHasher hasher = new FileHasher();
-
-        String out = hasher.hashFile("C:\\Gradle\\gradle-9.4.1\\bin\\gradle.bat");
-        System.out.println(out);
+        LocalTracker tracker = new LocalTracker();
+        File fileToTrack = new File("example.txt");
+        tracker.trackFile(fileToTrack);
     }
 }
