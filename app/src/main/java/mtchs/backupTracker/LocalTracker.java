@@ -100,4 +100,33 @@ public class LocalTracker {
             e.printStackTrace();
         }
     }
+
+    public void untrackFile(File file) {
+        try {
+            if (!Files.exists(JSON_FILE)) {
+                System.out.println("No files are currently being tracked.");
+                return;
+            }
+
+            String content = Files.readString(JSON_FILE).trim();
+            if (content.isEmpty()) {
+                System.out.println("No files are currently being tracked.");
+                return;
+            }
+
+            JSONArray trackedFiles = new JSONArray(content);
+            JSONArray updatedTrackedFiles = new JSONArray();
+
+            for (int i = 0; i < trackedFiles.length(); i++) {
+                JSONObject trackedFile = trackedFiles.getJSONObject(i);
+                if (!trackedFile.getString("location").equals(file.getAbsolutePath())) {
+                    updatedTrackedFiles.put(trackedFile);
+                }
+            }
+
+            Files.writeString(JSON_FILE, updatedTrackedFiles.toString(4));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 }
