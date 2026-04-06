@@ -3,11 +3,16 @@
  */
 package mtchs.backupTracker;
 
+import java.io.File;
+
 import mtchs.backupTracker.backupEngine.BackupEngine;
+import mtchs.backupTracker.backupEngine.FileHasher;
 
 public class App {
     public static void main(String[] args) {
-        BackupEngine backupEngine = new BackupEngine();
-        backupEngine.replaceFile("C:\\sourceFolder\\ptso.jpg", "C:\\destinationFolder\\sourceFolder_backup_1775074752873\\ptso.jpg");
+        FileHasher hasher = new FileHasher();
+
+        String out = hasher.hashFile("C:\\Gradle\\gradle-9.4.1\\bin\\gradle.bat");
+        System.out.println(out);
     }
 }

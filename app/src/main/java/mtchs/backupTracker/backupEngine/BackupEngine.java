@@ -7,8 +7,8 @@ import java.nio.file.*;
  * BackupEngine is responsible for performing backup operations. It provides a method to copy files and directories from a source folder to a destination folder, creating a backup with a timestamp.
  * 
  * @author Carsen Gafford
- * @version 1.2
- * @since 04-01-2026
+ * @version 1.3
+ * @since 04-06-2026
  */
 public class BackupEngine {
 
@@ -28,7 +28,7 @@ public class BackupEngine {
             System.out.println("Source and destination paths cannot be null.");
             return null;
         }
-        
+
         if (sourceFolder.trim().isEmpty() || destinationFolder.trim().isEmpty()) {
             System.out.println("Source and destination paths cannot be empty.");
             return null;
