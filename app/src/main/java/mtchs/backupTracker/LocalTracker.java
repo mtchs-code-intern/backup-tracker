@@ -11,13 +11,21 @@ import org.json.JSONObject;
 
 import mtchs.backupTracker.backupEngine.FileHasher;
 
+/**
+ * LocalTracker is responsible for tracking files locally by storing their name, location, and hash in a JSON file.
+ * 
+ * @author Carsen Gafford
+ * @version 1.0
+ * @since 04-06-2026
+ */
 public class LocalTracker {
     
     private static final Path JSON_FILE = getJsonPath();
     
     /**
-     * Gets the path for the tracked_files.json file.
-     * Stores in user's home directory under .backup-tracker/ for consistency across JAR runs.
+     * Gets the path to the JSON file used for tracking files. The file is stored in a hidden directory named ".backup-tracker" in the user's home directory. If the directory does not exist, it will be created. If there is an error creating the directory, an error message will be printed and the method will return a path to a non-existent file.
+     * 
+     * @return The path to the JSON file used for tracking files.
      */
     private static Path getJsonPath() {
         String homeDir = System.getProperty("user.home");
@@ -35,6 +43,11 @@ public class LocalTracker {
         
     }
 
+    /**
+     * Tracks a file by storing its name, location, and hash in a JSON file.
+     * 
+     * @param file The file to be tracked.
+     */
     public void trackFile(File file) {
         try {
             String name = file.getName();
