@@ -101,4 +101,18 @@ class AppTest {
 
         assertNull(result, "Expected null when destination path is a file, not a directory");
     }
+
+    @Test
+    void BackupWithSourceAndDestinationBeingTheSame() throws IOException {
+        BackupEngine backupEngine = new BackupEngine();
+
+        Path sourceDir = Files.createDirectory(tempDir.resolve("source"));
+
+        String result = backupEngine.backup(
+            sourceDir.toString(),
+            sourceDir.toString()
+        );
+
+        assertNull(result, "Expected null when source and destination paths are the same");
+    }
 }

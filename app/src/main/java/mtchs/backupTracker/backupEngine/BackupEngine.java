@@ -28,6 +28,16 @@ public class BackupEngine {
             System.out.println("Source and destination paths cannot be null.");
             return null;
         }
+        
+        if (sourceFolder.trim().isEmpty() || destinationFolder.trim().isEmpty()) {
+            System.out.println("Source and destination paths cannot be empty.");
+            return null;
+        }
+
+        if (sourceFolder.equals(destinationFolder)) {
+            System.out.println("Source and destination paths cannot be the same.");
+            return null;
+        }
 
         if (Files.isRegularFile(Paths.get(sourceFolder))) {
             System.out.println("Source path is a file. Please provide a directory.");
