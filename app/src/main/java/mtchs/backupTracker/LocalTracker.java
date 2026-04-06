@@ -13,6 +13,24 @@ import mtchs.backupTracker.backupEngine.FileHasher;
 
 public class LocalTracker {
     
+    private static final Path JSON_FILE = getJsonPath();
+    
+    /**
+     * Gets the path for the tracked_files.json file.
+     * Stores in user's home directory under .backup-tracker/ for consistency across JAR runs.
+     */
+    private static Path getJsonPath() {
+        String homeDir = System.getProperty("user.home");
+        Path appDir = Paths.get(homeDir, ".backup-tracker");
+        try {
+            Files.createDirectories(appDir);
+        } catch (Exception e) {
+            System.err.println("Could not create application directory: " + appDir);
+            e.printStackTrace();
+        }
+        return appDir.resolve("tracked_files.json");
+    }
+    
     public LocalTracker() {
         
     }
@@ -29,11 +47,10 @@ public class LocalTracker {
             fileObj.put("location", location);
             fileObj.put("hash", hash);
             
-            Path jsonPath = Paths.get("tracked_files.json");
             JSONArray trackedFiles;
             
-            if (Files.exists(jsonPath)) {
-                String content = Files.readString(jsonPath).trim();
+            if (Files.exists(JSON_FILE)) {
+                String content = Files.readString(JSON_FILE).trim();
                 if (content.isEmpty()) {
                     trackedFiles = new JSONArray();
                 } else {
@@ -65,7 +82,7 @@ public class LocalTracker {
                 trackedFiles = new JSONArray().put(fileObj);
             }
             
-            Files.writeString(jsonPath, trackedFiles.toString(4));
+            Files.writeString(JSON_FILE, trackedFiles.toString(4));
         } catch (Exception e) {
             e.printStackTrace();
         }
