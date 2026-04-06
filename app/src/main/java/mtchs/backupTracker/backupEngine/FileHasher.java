@@ -20,6 +20,11 @@ public class FileHasher {
         
     }
 
+    /**
+     * Generates a SHA-256 hash of the specified file's contents. The method reads the file in chunks to efficiently compute the hash, even for large files. If the file does not exist or an error occurs during reading, the method will return null.
+     * @param filePath The path to the file for which to generate a hash.
+     * @return The SHA-256 hash of the file's contents, or null if an error occurs.
+     */
     public String hashFile(String filePath) {
         filePath = filePath.trim();
         if (filePath.isEmpty()) {
