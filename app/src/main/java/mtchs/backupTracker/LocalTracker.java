@@ -4,6 +4,7 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.stream.Stream;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -44,58 +45,89 @@ public class LocalTracker {
     }
 
     public void trackFolder(File folder) {
-        if (folder.isDirectory()) {
-            try {
-                String sourcePath = folder.getAbsolutePath();
-                
-                JSONObject folderObj = new JSONObject();
-                folderObj.put("type", "directory");
-                folderObj.put("sourcePath", sourcePath);
-                folderObj.put("backupPath", JSONObject.NULL);
-                folderObj.put("hash", JSONObject.NULL);
-                
-                JSONArray trackedFiles;
-                
-                if (Files.exists(JSON_FILE)) {
-                    String content = Files.readString(JSON_FILE).trim();
-                    if (content.isEmpty()) {
-                        trackedFiles = new JSONArray();
-                    } else {
-                        try {
-                            trackedFiles = new JSONArray(content);
-                        } catch (JSONException e) {
-                            trackedFiles = new JSONArray();
-                        }
-                    }
-                } else {
-                    trackedFiles = new JSONArray();
-                }
-
-                if (trackedFiles.length() == 0 || !(trackedFiles.get(0) instanceof JSONObject)) {
-                    trackedFiles = new JSONArray();
-                }
-
-                for (int i = 0; i < trackedFiles.length(); i++) {
-                    JSONObject trackedItem = trackedFiles.getJSONObject(i);
-                    if (trackedItem.getString("sourcePath").equals(sourcePath)) {
-                        System.out.println("Folder is already being tracked.");
-                        return;
-                    }
-                }
-
-                if (trackedFiles.length() > 0 && trackedFiles.get(trackedFiles.length() - 1) instanceof JSONObject) {
-                    trackedFiles.put(folderObj);
-                } else {
-                    trackedFiles = new JSONArray().put(folderObj);
-                }
-                
-                Files.writeString(JSON_FILE, trackedFiles.toString(4));
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        } else {
+        if (!folder.isDirectory()) {
             System.out.println("Provided file is not a directory: " + folder.getAbsolutePath());
+            return;
         }
+
+        try {
+            FileHasher hasher = new FileHasher();
+            JSONArray trackedFiles = loadTrackedItems();
+            Path folderPath = folder.toPath().toAbsolutePath().normalize();
+            final java.util.concurrent.atomic.AtomicBoolean addedAny = new java.util.concurrent.atomic.AtomicBoolean(false);
+
+            try (Stream<Path> paths = Files.walk(folderPath)) {
+                paths.filter(Files::isRegularFile).forEach(path -> {
+                    try {
+                        String sourcePath = path.toAbsolutePath().normalize().toString();
+                        if (isAlreadyTracked(trackedFiles, sourcePath)) {
+                            return;
+                        }
+
+                        String hash = hasher.hashFile(path.toFile());
+                        if (hash == null) {
+                            System.err.println("Skipping locked or unreadable file: " + sourcePath);
+                            return;
+                        }
+
+                        JSONObject fileObj = new JSONObject();
+                        fileObj.put("type", "file");
+                        fileObj.put("sourcePath", sourcePath);
+                        fileObj.put("backupPath", JSONObject.NULL);
+                        fileObj.put("hash", hash);
+
+                        trackedFiles.put(fileObj);
+                        addedAny.set(true);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                });
+            }
+
+            if (!addedAny.get()) {
+                System.out.println("No new files to track in folder: " + folderPath);
+                return;
+            }
+
+            saveTrackedItems(trackedFiles);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private JSONArray loadTrackedItems() throws Exception {
+        if (Files.exists(JSON_FILE)) {
+            String content = Files.readString(JSON_FILE).trim();
+            if (content.isEmpty()) {
+                return new JSONArray();
+            }
+
+            try {
+                JSONArray trackedFiles = new JSONArray(content);
+                if (trackedFiles.length() == 0 || !(trackedFiles.get(0) instanceof JSONObject)) {
+                    return new JSONArray();
+                }
+                return trackedFiles;
+            } catch (JSONException e) {
+                return new JSONArray();
+            }
+        }
+
+        return new JSONArray();
+    }
+
+    private void saveTrackedItems(JSONArray trackedFiles) throws Exception {
+        Files.writeString(JSON_FILE, trackedFiles.toString(4));
+    }
+
+    private boolean isAlreadyTracked(JSONArray trackedFiles, String sourcePath) {
+        for (int i = 0; i < trackedFiles.length(); i++) {
+            JSONObject trackedItem = trackedFiles.getJSONObject(i);
+            if (trackedItem.getString("sourcePath").equals(sourcePath)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -175,13 +207,23 @@ public class LocalTracker {
             }
 
             JSONArray trackedFiles = new JSONArray(content);
+            Path source = Paths.get(sourcePath).toAbsolutePath().normalize();
+            boolean sourceIsDirectory = Files.isDirectory(source);
+            Path backupRoot = Paths.get(backupPath);
             JSONArray updatedTrackedFiles = new JSONArray();
 
             for (int i = 0; i < trackedFiles.length(); i++) {
                 JSONObject trackedItem = trackedFiles.getJSONObject(i);
-                if (trackedItem.getString("sourcePath").equals(sourcePath)) {
+                String trackedSource = trackedItem.getString("sourcePath");
+                Path trackedPath = Paths.get(trackedSource).toAbsolutePath().normalize();
+
+                if (sourceIsDirectory && trackedPath.startsWith(source)) {
+                    Path relative = source.relativize(trackedPath);
+                    trackedItem.put("backupPath", backupRoot.resolve(relative).toString());
+                } else if (!sourceIsDirectory && trackedSource.equals(sourcePath)) {
                     trackedItem.put("backupPath", backupPath);
                 }
+
                 updatedTrackedFiles.put(trackedItem);
             }
 

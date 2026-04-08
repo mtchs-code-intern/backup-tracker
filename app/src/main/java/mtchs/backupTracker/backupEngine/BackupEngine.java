@@ -115,7 +115,7 @@ public class BackupEngine {
         
         try {
             Files.copy(source, destination, StandardCopyOption.REPLACE_EXISTING);
-            System.out.println("File replaced successfully.");
+            System.out.println("File " + sourceFile + " replaced " + destinationFile);
         } catch (IOException e) {
             System.err.println("Failed to replace file: " + e.getMessage());
         }
@@ -141,8 +141,12 @@ public class BackupEngine {
                 }
             } else {
                 String sourceHash = hasher.hashFile(sourcePath);
+                if (sourceHash == null) {
+                    System.err.println("Skipping update; source file cannot be read: " + sourcePath);
+                    return;
+                }
                 String backupHash = hasher.hashFile(backupPath);
-                if (!sourceHash.equals(backupHash)) {
+                if (backupHash == null || !sourceHash.equals(backupHash)) {
                     replaceFile(sourcePath, backupPath);
                 }
             }
@@ -155,7 +159,13 @@ public class BackupEngine {
                     try {
                         Path relative = sourceDir.relativize(sourceFile);
                         Path backupFile = backupDir.resolve(relative);
-                        if (!Files.exists(backupFile) || !hasher.hashFile(sourceFile.toString()).equals(hasher.hashFile(backupFile.toString()))) {
+                        String sourceHash = hasher.hashFile(sourceFile.toString());
+                        if (sourceHash == null) {
+                            System.err.println("Skipping locked or unreadable source file: " + sourceFile);
+                            return;
+                        }
+                        String backupHash = hasher.hashFile(backupFile.toString());
+                        if (!Files.exists(backupFile) || backupHash == null || !sourceHash.equals(backupHash)) {
                             Files.createDirectories(backupFile.getParent());
                             Files.copy(sourceFile, backupFile, StandardCopyOption.REPLACE_EXISTING);
                             System.out.println("Updated/Copied: " + relative);
