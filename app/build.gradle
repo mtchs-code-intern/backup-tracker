@@ -32,6 +32,13 @@ java {
         languageVersion = JavaLanguageVersion.of(26)
     }
 }
+jar {
+    manifest {
+        attributes(
+            'Main-Class': 'mtchs.backupTracker.App'
+        )
+    }
+}
 
 application {
     // Define the main class for the application.
