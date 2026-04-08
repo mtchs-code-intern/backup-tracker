@@ -32,11 +32,22 @@ java {
         languageVersion = JavaLanguageVersion.of(26)
     }
 }
+
 jar {
+    archiveClassifier = 'all'
+
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
     manifest {
         attributes(
             'Main-Class': 'mtchs.backupTracker.App'
         )
+    }
+
+    from {
+        configurations.runtimeClasspath.collect { 
+            it.isDirectory() ? it : zipTree(it) 
+        }
     }
 }
 
