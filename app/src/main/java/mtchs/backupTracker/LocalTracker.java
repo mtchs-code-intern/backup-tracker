@@ -43,21 +43,55 @@ public class LocalTracker {
         
     }
 
-    /**
-     * Tracks a folder by recursively tracking all files within the folder and its subfolders.
-     * @param folder The folder to be tracked.
-     */
     public void trackFolder(File folder) {
         if (folder.isDirectory()) {
-            File[] files = folder.listFiles();
-            if (files != null) {
-                for (File file : files) {
-                    if (file.isFile()) {
-                        trackFile(file);
-                    } else if (file.isDirectory()) {
-                        trackFolder(file);
+            try {
+                String sourcePath = folder.getAbsolutePath();
+                
+                JSONObject folderObj = new JSONObject();
+                folderObj.put("type", "directory");
+                folderObj.put("sourcePath", sourcePath);
+                folderObj.put("backupPath", JSONObject.NULL);
+                folderObj.put("hash", JSONObject.NULL);
+                
+                JSONArray trackedFiles;
+                
+                if (Files.exists(JSON_FILE)) {
+                    String content = Files.readString(JSON_FILE).trim();
+                    if (content.isEmpty()) {
+                        trackedFiles = new JSONArray();
+                    } else {
+                        try {
+                            trackedFiles = new JSONArray(content);
+                        } catch (JSONException e) {
+                            trackedFiles = new JSONArray();
+                        }
+                    }
+                } else {
+                    trackedFiles = new JSONArray();
+                }
+
+                if (trackedFiles.length() == 0 || !(trackedFiles.get(0) instanceof JSONObject)) {
+                    trackedFiles = new JSONArray();
+                }
+
+                for (int i = 0; i < trackedFiles.length(); i++) {
+                    JSONObject trackedItem = trackedFiles.getJSONObject(i);
+                    if (trackedItem.getString("sourcePath").equals(sourcePath)) {
+                        System.out.println("Folder is already being tracked.");
+                        return;
                     }
                 }
+
+                if (trackedFiles.length() > 0 && trackedFiles.get(trackedFiles.length() - 1) instanceof JSONObject) {
+                    trackedFiles.put(folderObj);
+                } else {
+                    trackedFiles = new JSONArray().put(folderObj);
+                }
+                
+                Files.writeString(JSON_FILE, trackedFiles.toString(4));
+            } catch (Exception e) {
+                e.printStackTrace();
             }
         } else {
             System.out.println("Provided file is not a directory: " + folder.getAbsolutePath());
@@ -71,14 +105,14 @@ public class LocalTracker {
      */
     public void trackFile(File file) {
         try {
-            String name = file.getName();
-            String location = file.getAbsolutePath();
+            String sourcePath = file.getAbsolutePath();
             FileHasher hasher = new FileHasher();
             String hash = hasher.hashFile(file);
             
             JSONObject fileObj = new JSONObject();
-            fileObj.put("name", name);
-            fileObj.put("location", location);
+            fileObj.put("type", "file");
+            fileObj.put("sourcePath", sourcePath);
+            fileObj.put("backupPath", JSONObject.NULL);
             fileObj.put("hash", hash);
             
             JSONArray trackedFiles;
@@ -104,7 +138,7 @@ public class LocalTracker {
 
             for (int i = 0; i < trackedFiles.length(); i++) {
                 JSONObject trackedFile = trackedFiles.getJSONObject(i);
-                if (trackedFile.getString("location").equals(location)) {
+                if (trackedFile.getString("sourcePath").equals(sourcePath)) {
                     System.out.println("File is already being tracked.");
                     return;
                 }
@@ -123,10 +157,39 @@ public class LocalTracker {
     }
 
     /**
-     * Untracks a file by removing its entry from the JSON file.
-     * 
-     * @param file The file to be untracked.
+     * Sets the backup path for a tracked item.
+     * @param sourcePath The source path of the item.
+     * @param backupPath The backup path to set.
      */
+    public void setBackupPath(String sourcePath, String backupPath) {
+        try {
+            if (!Files.exists(JSON_FILE)) {
+                System.out.println("No files are currently being tracked.");
+                return;
+            }
+
+            String content = Files.readString(JSON_FILE).trim();
+            if (content.isEmpty()) {
+                System.out.println("No files are currently being tracked.");
+                return;
+            }
+
+            JSONArray trackedFiles = new JSONArray(content);
+            JSONArray updatedTrackedFiles = new JSONArray();
+
+            for (int i = 0; i < trackedFiles.length(); i++) {
+                JSONObject trackedItem = trackedFiles.getJSONObject(i);
+                if (trackedItem.getString("sourcePath").equals(sourcePath)) {
+                    trackedItem.put("backupPath", backupPath);
+                }
+                updatedTrackedFiles.put(trackedItem);
+            }
+
+            Files.writeString(JSON_FILE, updatedTrackedFiles.toString(4));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
     public void untrackFile(File file) {
         try {
             if (!Files.exists(JSON_FILE)) {
@@ -145,7 +208,7 @@ public class LocalTracker {
 
             for (int i = 0; i < trackedFiles.length(); i++) {
                 JSONObject trackedFile = trackedFiles.getJSONObject(i);
-                if (!trackedFile.getString("location").equals(file.getAbsolutePath())) {
+                if (!trackedFile.getString("sourcePath").equals(file.getAbsolutePath())) {
                     updatedTrackedFiles.put(trackedFile);
                 }
             }
@@ -153,6 +216,28 @@ public class LocalTracker {
             Files.writeString(JSON_FILE, updatedTrackedFiles.toString(4));
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    /**
+     * Gets all tracked items.
+     * @return JSONArray of tracked items.
+     */
+    public JSONArray getTrackedItems() {
+        try {
+            if (!Files.exists(JSON_FILE)) {
+                return new JSONArray();
+            }
+
+            String content = Files.readString(JSON_FILE).trim();
+            if (content.isEmpty()) {
+                return new JSONArray();
+            }
+
+            return new JSONArray(content);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new JSONArray();
         }
     }
 

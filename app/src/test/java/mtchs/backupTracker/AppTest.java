@@ -12,6 +12,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 
 /**
  * AppTest contains unit tests
@@ -86,7 +87,8 @@ class AppTest {
             destDir.toString()
         );
 
-        assertNull(result, "Expected null when source path is a file, not a directory");
+        assertNotNull(result, "Expected backup path when source is a file");
+        assertTrue(Files.exists(Paths.get(result)), "Backup file should exist");
     }
 
     @Test

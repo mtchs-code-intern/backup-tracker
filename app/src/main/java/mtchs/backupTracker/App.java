@@ -5,6 +5,9 @@ package mtchs.backupTracker;
 
 import java.io.File;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 import mtchs.backupTracker.backupEngine.BackupEngine;
 import mtchs.backupTracker.backupEngine.FileHasher;
 
@@ -34,11 +37,30 @@ public class App {
             } else if (fileToTrack.isFile()) {
                 tracker.trackFile(fileToTrack);
             }
-            backupEngine.backup(args[1], args[2]);
+            String backupPath = backupEngine.backup(args[1], args[2]);
+            if (backupPath != null) {
+                tracker.setBackupPath(args[1], backupPath);
+            }
 
             System.out.println("File/Folder tracked and backed up successfully");
         } else if (args[0].equals("-update") && args.length == 1) {
-            // TODO: Implement update functionality
+            BackupEngine backupEngine = new BackupEngine();
+            LocalTracker tracker = new LocalTracker();
+            FileHasher hasher = new FileHasher();
+            
+            JSONArray trackedItems = tracker.getTrackedItems();
+            for (int i = 0; i < trackedItems.length(); i++) {
+                JSONObject item = trackedItems.getJSONObject(i);
+                String type = item.getString("type");
+                String sourcePath = item.getString("sourcePath");
+                if (item.isNull("backupPath")) {
+                    System.out.println("No backup path for " + sourcePath + ", skipping.");
+                    continue;
+                }
+                String backupPath = item.getString("backupPath");
+                backupEngine.updateBackup(type, sourcePath, backupPath, hasher);
+            }
+            System.out.println("Update completed.");
         }
     }
 }

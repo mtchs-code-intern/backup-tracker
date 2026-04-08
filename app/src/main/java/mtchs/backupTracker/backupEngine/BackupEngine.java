@@ -17,30 +17,25 @@ public class BackupEngine {
     }
 
     /**
-     * Performs a backup of the specified source folder to the destination folder. The backup will be created with a timestamp in the name.
-     * @param sourceFolder The path to the folder to be backed up.
+     * Performs a backup of the specified source to the destination folder. If source is a file, copies it to destination with the same name. If source is a directory, creates a timestamped backup folder.
+     * @param sourcePath The path to the file or folder to be backed up.
      * @param destinationFolder The path to the folder where the backup will be stored.
-     * @return The path to the created backup folder, or null if the backup failed.
+     * @return The path to the created backup, or null if the backup failed.
      */
-    public String backup(String sourceFolder, String destinationFolder) {
+    public String backup(String sourcePath, String destinationFolder) {
 
-        if (sourceFolder == null || destinationFolder == null) {
+        if (sourcePath == null || destinationFolder == null) {
             System.out.println("Source and destination paths cannot be null.");
             return null;
         }
 
-        if (sourceFolder.trim().isEmpty() || destinationFolder.trim().isEmpty()) {
+        if (sourcePath.trim().isEmpty() || destinationFolder.trim().isEmpty()) {
             System.out.println("Source and destination paths cannot be empty.");
             return null;
         }
 
-        if (sourceFolder.equals(destinationFolder)) {
+        if (sourcePath.equals(destinationFolder)) {
             System.out.println("Source and destination paths cannot be the same.");
-            return null;
-        }
-
-        if (Files.isRegularFile(Paths.get(sourceFolder))) {
-            System.out.println("Source path is a file. Please provide a directory.");
             return null;
         }
 
@@ -51,38 +46,52 @@ public class BackupEngine {
             return null;
         }
 
-        Path source = Paths.get(sourceFolder);
-        final Path destination = destinationRoot.resolve(source.getFileName() + "_backup_" + System.currentTimeMillis());
+        Path source = Paths.get(sourcePath);
 
         if (!Files.exists(source)) {
-            System.out.println("Source folder does not exist.");
+            System.out.println("Source does not exist.");
             return null;
         }
 
+        Path backupPath;
+        if (Files.isRegularFile(source)) {
+            backupPath = destinationRoot.resolve(source.getFileName());
+            try {
+                Files.copy(source, backupPath, StandardCopyOption.REPLACE_EXISTING);
+                System.out.println("File backup completed successfully.");
+                return backupPath.toString();
+            } catch (IOException e) {
+                System.err.println("Failed to backup file: " + e.getMessage());
+                return null;
+            }
+        } else {
+            // Directory
+            backupPath = destinationRoot.resolve(source.getFileName() + "_backup_" + System.currentTimeMillis());
 
-        try {
-            Files.walk(source).forEach(path -> {
-                try {
-                    Path target = destination.resolve(source.relativize(path));
+            try {
+                Files.walk(source).forEach(path -> {
+                    try {
+                        Path target = backupPath.resolve(source.relativize(path));
 
-                    if (Files.isDirectory(path)) {
-                        Files.createDirectories(target);
-                    } else {
-                        Files.copy(path, target, StandardCopyOption.REPLACE_EXISTING);
+                        if (Files.isDirectory(path)) {
+                            Files.createDirectories(target);
+                        } else {
+                            Files.copy(path, target, StandardCopyOption.REPLACE_EXISTING);
+                        }
+
+                    } catch (IOException e) {
+                        System.err.println("Failed to copy: " + path + " -> " + e.getMessage());
                     }
+                });
 
-                } catch (IOException e) {
-                    System.err.println("Failed to copy: " + path + " -> " + e.getMessage());
-                }
-            });
+                System.out.println("Backup completed successfully.");
+                return backupPath.toString();
 
-            System.out.println("Backup completed successfully.");
-            return destination.toString();
-
-        } catch (IOException e) {
-            System.err.println("Error walking file tree: " + e.getMessage());
+            } catch (IOException e) {
+                System.err.println("Error walking file tree: " + e.getMessage());
+            }
+            return null;
         }
-        return null;
     }
 
     /**
@@ -109,6 +118,69 @@ public class BackupEngine {
             System.out.println("File replaced successfully.");
         } catch (IOException e) {
             System.err.println("Failed to replace file: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Updates the backup for a tracked item.
+     * @param type The type of the item ("file" or "directory").
+     * @param sourcePath The source path.
+     * @param backupPath The backup path.
+     * @param hasher The FileHasher instance.
+     */
+    public void updateBackup(String type, String sourcePath, String backupPath, FileHasher hasher) {
+        if ("file".equals(type)) {
+            Path source = Paths.get(sourcePath);
+            Path backup = Paths.get(backupPath);
+            if (!Files.exists(source)) {
+                try {
+                    Files.deleteIfExists(backup);
+                    System.out.println("Deleted backup file: " + backupPath);
+                } catch (IOException e) {
+                    System.err.println("Failed to delete backup file: " + e.getMessage());
+                }
+            } else {
+                String sourceHash = hasher.hashFile(sourcePath);
+                String backupHash = hasher.hashFile(backupPath);
+                if (!sourceHash.equals(backupHash)) {
+                    replaceFile(sourcePath, backupPath);
+                }
+            }
+        } else if ("directory".equals(type)) {
+            Path sourceDir = Paths.get(sourcePath);
+            Path backupDir = Paths.get(backupPath);
+            try {
+                // Update/add files
+                Files.walk(sourceDir).filter(Files::isRegularFile).forEach(sourceFile -> {
+                    try {
+                        Path relative = sourceDir.relativize(sourceFile);
+                        Path backupFile = backupDir.resolve(relative);
+                        if (!Files.exists(backupFile) || !hasher.hashFile(sourceFile.toString()).equals(hasher.hashFile(backupFile.toString()))) {
+                            Files.createDirectories(backupFile.getParent());
+                            Files.copy(sourceFile, backupFile, StandardCopyOption.REPLACE_EXISTING);
+                            System.out.println("Updated/Copied: " + relative);
+                        }
+                    } catch (IOException e) {
+                        System.err.println("Failed to update: " + sourceFile + " -> " + e.getMessage());
+                    }
+                });
+
+                // Remove deleted files
+                Files.walk(backupDir).filter(Files::isRegularFile).forEach(backupFile -> {
+                    try {
+                        Path relative = backupDir.relativize(backupFile);
+                        Path sourceFile = sourceDir.resolve(relative);
+                        if (!Files.exists(sourceFile)) {
+                            Files.delete(backupFile);
+                            System.out.println("Deleted: " + relative);
+                        }
+                    } catch (IOException e) {
+                        System.err.println("Failed to delete: " + backupFile + " -> " + e.getMessage());
+                    }
+                });
+            } catch (IOException e) {
+                System.err.println("Error updating directory: " + e.getMessage());
+            }
         }
     }
 }
