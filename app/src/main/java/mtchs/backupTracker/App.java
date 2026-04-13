@@ -15,7 +15,7 @@ import mtchs.backupTracker.backupEngine.FileHasher;
  * App is the main entry point for the Backup Tracker application. It currently only supports a version flag to display the application version.
  * 
  * @author Carsen Gafford
- * @version 0.1.0
+ * @version 1.0.0
  * @since 04-13-2026
  */
 public class App {
@@ -26,7 +26,7 @@ public class App {
         }
         
         if (args[0].equals("-v") || args[0].equals("--version") && args.length == 1) {
-            System.out.println("Backup Tracker Version 0.0.3");
+            System.out.println("Backup Tracker Version 1.0.0");
         } else if (args[0].equals("-track") || args[0].equals("-t") && args.length == 3) {
             BackupEngine backupEngine = new BackupEngine();
             LocalTracker tracker = new LocalTracker();
@@ -80,9 +80,37 @@ public class App {
             System.out.println("  -track, -t <source> <dest>   Track a file or folder and back it up to the specified destination");
             System.out.println("  -update, -u                  Update all tracked items by re-backing them up if they have changed");
             System.out.println("  -backup, -b <source> <dest>  Perform a backup of the specified source to the destination folder");
+            System.out.println("  -list, -l                    List all currently tracked items");
+            System.out.println("  -stoptrack, -st <source>     Stop tracking the specified source file or folder");
+            System.out.println("  -stoptrack, -st -all         Stop tracking all items");
             System.out.println("  -help, -h                    Display this help message");
+        } else if (args[0].equals("-stoptrack") || args[0].equals("-st") && args.length == 2 && !args[1].equals("-all") && !args[1].equals("-a")) {
+            LocalTracker tracker = new LocalTracker();
+            tracker.stopTracking(args[1]);
+        } else if (args[0].equals("-list") || args[0].equals("-l") && args.length == 1) {
+            LocalTracker tracker = new LocalTracker();
+            JSONArray trackedItems = tracker.getTrackedItems();
+            if (trackedItems.length() == 0) {
+                System.out.println("No items are currently being tracked.");
+            } else {
+                System.out.println("Currently tracked items:");
+                for (int i = 0; i < trackedItems.length(); i++) {
+                    JSONObject item = trackedItems.getJSONObject(i);
+                    String type = item.getString("type");
+                    String sourcePath = item.getString("sourcePath");
+                    String backupPath = item.isNull("backupPath") ? "No backup path set" : item.getString("backupPath");
+                    System.out.println((i+1) + ". [" + type + "] " + sourcePath + " -> " + backupPath);
+                }
+            }
+        } else if (args[0].equals("-stoptrack") || args[0].equals("-st") && args.length == 2 && args[1].equals("-all") || args[1].equals("-a")) {
+            LocalTracker tracker = new LocalTracker();
+            for (int i = 0; i < tracker.getTrackedItems().length(); i++) {
+                JSONObject item = tracker.getTrackedItems().getJSONObject(i);
+                String sourcePath = item.getString("sourcePath");
+                tracker.stopTracking(sourcePath);
+            }
         } else {
-            System.out.println("Invalid arguments. Use -help for usage information.");
+            System.out.println("Invalid arguments. Use -help or -h for usage information.");
         }
     }
 }

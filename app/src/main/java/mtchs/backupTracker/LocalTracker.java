@@ -15,8 +15,6 @@ import mtchs.backupTracker.backupEngine.FileHasher;
  * LocalTracker is responsible for tracking files locally by storing their name, location, and hash in a JSON file.
  * 
  * @author Carsen Gafford
- * @version 1.0
- * @since 04-13-2026
  */
 public class LocalTracker {
     
@@ -158,6 +156,34 @@ public class LocalTracker {
             }
             
             Files.writeString(JSON_FILE, trackedFiles.toString(4));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void stopTracking(String sourcePath) {
+        try {
+            if (!Files.exists(JSON_FILE)) {
+                System.out.println("No items are currently being tracked.");
+                return;
+            }
+
+            String content = Files.readString(JSON_FILE).trim();
+            if (content.isEmpty()) {
+                System.out.println("No items are currently being tracked.");
+                return;
+            }
+
+            JSONArray trackedItems = new JSONArray(content);
+            JSONArray updatedTrackedItems = new JSONArray();
+
+            for (int i = 0; i < trackedItems.length(); i++) {
+                JSONObject trackedItem = trackedItems.getJSONObject(i);
+                if (!trackedItem.getString("sourcePath").equals(sourcePath)) {
+                    updatedTrackedItems.put(trackedItem);
+                }
+            }
+            Files.writeString(JSON_FILE, updatedTrackedItems.toString(4));
         } catch (Exception e) {
             e.printStackTrace();
         }

@@ -12,8 +12,6 @@ import java.security.NoSuchAlgorithmException;
  * FileHasher is responsible for generating a hash of a file's contents. It provides a method to compute the SHA-256 hash of a specified file.
  * 
  * @author Carsen Gafford
- * @version 1.0
- * @since 04-06-2026
  */
 public class FileHasher {
     
