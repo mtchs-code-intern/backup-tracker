@@ -15,8 +15,8 @@ import mtchs.backupTracker.backupEngine.FileHasher;
  * App is the main entry point for the Backup Tracker application. It currently only supports a version flag to display the application version.
  * 
  * @author Carsen Gafford
- * @version 0.0.3
- * @since 04-06-2026
+ * @version 0.1.0
+ * @since 04-13-2026
  */
 public class App {
     public static void main(String[] args) {
@@ -25,9 +25,9 @@ public class App {
             System.out.println("No arguments provided");
         }
         
-        if (args[0].equals("-v") && args.length == 1) {
+        if (args[0].equals("-v") || args[0].equals("--version") && args.length == 1) {
             System.out.println("Backup Tracker Version 0.0.3");
-        } else if (args[0].equals("-track") && args.length == 3) {
+        } else if (args[0].equals("-track") || args[0].equals("-t") && args.length == 3) {
             BackupEngine backupEngine = new BackupEngine();
             LocalTracker tracker = new LocalTracker();
             File fileToTrack = new File(args[1]);
@@ -43,7 +43,7 @@ public class App {
             }
 
             System.out.println("File/Folder tracked and backed up successfully");
-        } else if (args[0].equals("-update") && args.length == 1) {
+        } else if (args[0].equals("-update") || args[0].equals("-u") && args.length == 1) {
             BackupEngine backupEngine = new BackupEngine();
             LocalTracker tracker = new LocalTracker();
             FileHasher hasher = new FileHasher();
@@ -66,6 +66,23 @@ public class App {
             }
             System.out.println("\rUpdating backups... [100%]");
             System.out.println("Update completed.");
+        } else if (args[0].equals("-backup") || args[0].equals("-b") && args.length == 3) {
+            BackupEngine backupEngine = new BackupEngine();
+            String backupPath = backupEngine.backup(args[1], args[2]);
+            if (backupPath != null) {
+                System.out.println("Backup completed successfully: " + backupPath);
+            } else {
+                System.out.println("Backup failed.");
+            }
+        } else if (args[0].equals("-help") || args[0].equals("-h")) {
+            System.out.println("Usage:");
+            System.out.println("  -v, --version                Display the application version");
+            System.out.println("  -track, -t <source> <dest>   Track a file or folder and back it up to the specified destination");
+            System.out.println("  -update, -u                  Update all tracked items by re-backing them up if they have changed");
+            System.out.println("  -backup, -b <source> <dest>  Perform a backup of the specified source to the destination folder");
+            System.out.println("  -help, -h                    Display this help message");
+        } else {
+            System.out.println("Invalid arguments. Use -help for usage information.");
         }
     }
 }
