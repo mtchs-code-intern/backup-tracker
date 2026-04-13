@@ -69,6 +69,10 @@ public class BackupEngine {
             backupPath = destinationRoot.resolve(source.getFileName() + "_backup_" + System.currentTimeMillis());
 
             try {
+                // Count total files
+                long totalFiles = Files.walk(source).filter(Files::isRegularFile).count();
+                System.out.println("Backing up " + totalFiles + " files...");
+
                 Files.walk(source).forEach(path -> {
                     try {
                         Path target = backupPath.resolve(source.relativize(path));
@@ -80,7 +84,11 @@ public class BackupEngine {
                         }
 
                     } catch (IOException e) {
-                        System.err.println("Failed to copy: " + path + " -> " + e.getMessage());
+                        if (path.toString().toLowerCase().endsWith(".lock")) {
+                            System.out.println("Skipping locked file: " + path);
+                        } else {
+                            System.err.println("Failed to copy: " + path + " -> " + e.getMessage());
+                        }
                     }
                 });
 
@@ -154,6 +162,10 @@ public class BackupEngine {
             Path sourceDir = Paths.get(sourcePath);
             Path backupDir = Paths.get(backupPath);
             try {
+                // Count total source files for progress
+                long totalSourceFiles = Files.walk(sourceDir).filter(Files::isRegularFile).count();
+                System.out.println("Updating " + totalSourceFiles + " source files...");
+
                 // Update/add files
                 Files.walk(sourceDir).filter(Files::isRegularFile).forEach(sourceFile -> {
                     try {
@@ -165,15 +177,25 @@ public class BackupEngine {
                             return;
                         }
                         String backupHash = hasher.hashFile(backupFile.toString());
-                        if (!Files.exists(backupFile) || backupHash == null || !sourceHash.equals(backupHash)) {
+                        if (!Files.exists(backupFile) || (backupHash != null && !sourceHash.equals(backupHash))) {
                             Files.createDirectories(backupFile.getParent());
                             Files.copy(sourceFile, backupFile, StandardCopyOption.REPLACE_EXISTING);
                             System.out.println("Updated/Copied: " + relative);
+                        } else if (backupHash == null && Files.exists(backupFile)) {
+                            System.out.println("Skipping update for locked or unreadable backup file: " + backupFile);
                         }
                     } catch (IOException e) {
-                        System.err.println("Failed to update: " + sourceFile + " -> " + e.getMessage());
+                        if (sourceFile.toString().toLowerCase().endsWith(".lock")) {
+                            System.out.println("Skipping locked file: " + sourceFile);
+                        } else {
+                            System.err.println("Failed to update: " + sourceFile + " -> " + e.getMessage());
+                        }
                     }
                 });
+
+                System.out.println("Checking for deleted files...");
+                // Count total backup files for progress
+                long totalBackupFiles = Files.walk(backupDir).filter(Files::isRegularFile).count();
 
                 // Remove deleted files
                 Files.walk(backupDir).filter(Files::isRegularFile).forEach(backupFile -> {
@@ -188,6 +210,7 @@ public class BackupEngine {
                         System.err.println("Failed to delete: " + backupFile + " -> " + e.getMessage());
                     }
                 });
+                System.out.println();
             } catch (IOException e) {
                 System.err.println("Error updating directory: " + e.getMessage());
             }

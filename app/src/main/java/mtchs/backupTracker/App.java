@@ -49,6 +49,7 @@ public class App {
             FileHasher hasher = new FileHasher();
             
             JSONArray trackedItems = tracker.getTrackedItems();
+            System.out.println("Updating backups... [0%]");
             for (int i = 0; i < trackedItems.length(); i++) {
                 JSONObject item = trackedItems.getJSONObject(i);
                 String type = item.getString("type");
@@ -58,8 +59,12 @@ public class App {
                     continue;
                 }
                 String backupPath = item.getString("backupPath");
+                System.out.println("Updating item " + (i+1) + "/" + trackedItems.length() + ": " + sourcePath);
                 backupEngine.updateBackup(type, sourcePath, backupPath, hasher);
+                int percent = (int) (((i + 1) * 100) / trackedItems.length());
+                System.out.print("\rUpdating backups... [" + percent + "%]");
             }
+            System.out.println("\rUpdating backups... [100%]");
             System.out.println("Update completed.");
         }
     }
