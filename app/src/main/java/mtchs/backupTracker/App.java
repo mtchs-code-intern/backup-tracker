@@ -4,6 +4,7 @@
 package mtchs.backupTracker;
 
 import java.io.File;
+import java.nio.file.Paths;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -15,7 +16,7 @@ import mtchs.backupTracker.backupEngine.FileHasher;
  * App is the main entry point for the Backup Tracker application. It currently only supports a version flag to display the application version.
  * 
  * @author Carsen Gafford
- * @version 1.0.0
+ * @version 1.1.4
  * @since 04-13-2026
  */
 public class App {
@@ -26,7 +27,7 @@ public class App {
         }
         
         if (args[0].equals("-v") || args[0].equals("--version") && args.length == 1) {
-            System.out.println("Backup Tracker Version 1.0.0");
+            System.out.println("Backup Tracker Version 1.1.4");
         } else if (args[0].equals("-track") || args[0].equals("-t") && args.length == 3) {
             BackupEngine backupEngine = new BackupEngine();
             LocalTracker tracker = new LocalTracker();
@@ -79,6 +80,7 @@ public class App {
             System.out.println("  -v, --version                Display the application version");
             System.out.println("  -track, -t <source> <dest>   Track a file or folder and back it up to the specified destination");
             System.out.println("  -update, -u                  Update all tracked items by re-backing them up if they have changed");
+            System.out.println("  -update, -u <source>         Update a specific tracked item by re-backing it up if it has changed");
             System.out.println("  -backup, -b <source> <dest>  Perform a backup of the specified source to the destination folder");
             System.out.println("  -list, -l                    List all currently tracked items");
             System.out.println("  -stoptrack, -st <source>     Stop tracking the specified source file or folder");
@@ -109,6 +111,38 @@ public class App {
                 String sourcePath = item.getString("sourcePath");
                 tracker.stopTracking(sourcePath);
             }
+        } else if (args[0].equals("-update") || args[0].equals("-u") && args.length == 2) {
+            BackupEngine backupEngine = new BackupEngine();
+            LocalTracker tracker = new LocalTracker();
+            FileHasher hasher = new FileHasher();
+            String sourcePath = args[1];
+            // Normalize the path to handle trailing backslashes
+            sourcePath = Paths.get(sourcePath).toAbsolutePath().normalize().toString();
+            if (sourcePath.endsWith(File.separator)) {
+                sourcePath = sourcePath.substring(0, sourcePath.length() - File.separator.length());
+            }
+            JSONObject itemToUpdate = null;
+            JSONArray trackedItems = tracker.getTrackedItems();
+            for (int i = 0; i < trackedItems.length(); i++) {
+                JSONObject item = trackedItems.getJSONObject(i);
+                if (item.getString("sourcePath").equals(sourcePath)) {
+                    itemToUpdate = item;
+                    break;
+                }
+            }
+            if (itemToUpdate == null) {
+                System.out.println("No tracked item found with source path: " + sourcePath);
+                return;
+            }
+            String type = itemToUpdate.getString("type");
+            if (itemToUpdate.isNull("backupPath")) {
+                System.out.println("No backup path for " + sourcePath + ", cannot update.");
+                return;
+            }
+            String backupPath = itemToUpdate.getString("backupPath");
+            System.out.println("Updating item: " + sourcePath);
+            backupEngine.updateBackup(type, sourcePath, backupPath, hasher);
+            System.out.println("Update completed for: " + sourcePath);
         } else {
             System.out.println("Invalid arguments. Use -help or -h for usage information.");
         }
