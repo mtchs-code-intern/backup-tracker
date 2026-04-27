@@ -15,7 +15,7 @@ Application for making a backup of a folder and tracking changes to any files or
 ## Installation
 1. Clone the repository:
    ```
-   git clone https://github.com/mtchs-code-intern/backup-tracker/
+   git clone https://github.com/mtchs-code-intern/backup-tracker.git
    ```
 2. Navigate to the project directory:
    ```
