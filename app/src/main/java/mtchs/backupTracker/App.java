@@ -26,7 +26,7 @@ public class App {
             System.out.println("No arguments provided");
         }
         
-        if (args[0].equals("-v") || args[0].equals("--version") && args.length == 1) {
+        if (args[0].equals("-v") || args[0].equals("-version") && args.length == 1) {
             System.out.println("Backup Tracker Version 1.1.4");
         } else if (args[0].equals("-track") || args[0].equals("-t") && args.length == 3) {
             BackupEngine backupEngine = new BackupEngine();
@@ -77,7 +77,7 @@ public class App {
             }
         } else if (args[0].equals("-help") || args[0].equals("-h")) {
             System.out.println("Usage:");
-            System.out.println("  -v, --version                Display the application version");
+            System.out.println("  -v, -version                Display the application version");
             System.out.println("  -track, -t <source> <dest>   Track a file or folder and back it up to the specified destination");
             System.out.println("  -update, -u                  Update all tracked items by re-backing them up if they have changed");
             System.out.println("  -update, -u <source>         Update a specific tracked item by re-backing it up if it has changed");
