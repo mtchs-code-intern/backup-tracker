@@ -1,20 +1,21 @@
 # Backup Tracker
 
 ## Description
-[Brief description of what your backup tracker program does. For example: "A Java application for tracking and managing backup operations."]
+Application for making a backup of a folder and tracking changes to any files or folders within the tracked folder.
 
 ## Features
-- [List key features here]
-- [Add more features as needed]
+- Fully functioning CLI tool
+- Backup creation
+- Backup change tracking
 
 ## Prerequisites
-- Java [version, e.g., 11 or higher]
-- Gradle [version, e.g., 7.0 or higher]
+- Java 26
+- Gradle 9.4.1
 
 ## Installation
 1. Clone the repository:
    ```
-   git clone [repository URL]
+   git clone https://github.com/mtchs-code-intern/backup-tracker/
    ```
 2. Navigate to the project directory:
    ```
@@ -24,14 +25,15 @@
    ```
    ./gradlew build
    ```
-
+Alternatively you can download the installer [here](https://github.com/mtchs-code-intern/backup-tracker-installer).
 ## Usage
-[Explain how to run the application. For example:]
 ```
-./gradlew run
+./gradlew run --args="-help"
 ```
-[Provide examples of command-line arguments or usage scenarios.]
-
+OR if on PATH
+```
+backuptracker -help
+```
 ## Building
 To build the project:
 ```
@@ -43,9 +45,3 @@ To run tests:
 ```
 ./gradlew test
 ```
-
-## Contributing
-[Guidelines for contributing to the project, if applicable.]
-
-## License
-[Specify the license, e.g., MIT, Apache 2.0, or GPL.]
