@@ -1,25 +1,29 @@
 package mtchs.backupTracker.backupEngine;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
+import java.time.Duration;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-/**
- * BackupEngine is responsible for performing backup operations. It provides a method to copy files and directories from a source folder to a destination folder, creating a backup with a timestamp.
- * 
- * @author Carsen Gafford
- */
+import mtchs.backupTracker.GoogleDriveAuthManager;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 public class BackupEngine {
 
+    private final GoogleDriveAuthManager authManager = new GoogleDriveAuthManager();
+
     public BackupEngine() {
-        
     }
 
-    /**
-     * Performs a backup of the specified source to the destination folder. If source is a file, copies it to destination with the same name. If source is a directory, creates a timestamped backup folder.
-     * @param sourcePath The path to the file or folder to be backed up.
-     * @param destinationFolder The path to the folder where the backup will be stored.
-     * @return The path to the created backup, or null if the backup failed.
-     */
     public String backup(String sourcePath, String destinationFolder) {
 
         if (sourcePath == null || destinationFolder == null) {
@@ -53,21 +57,44 @@ public class BackupEngine {
 
         Path backupPath;
         if (Files.isRegularFile(source)) {
+            if (isGoogleSheetsShortcut(source)) {
+                backupPath = destinationRoot.resolve(replaceGsheetExtension(source.getFileName().toString()));
+                try {
+                    backupGoogleSheetFile(source, backupPath);
+                    System.out.println("Converted and backed up .gsheet successfully.");
+                    return backupPath.toString();
+                } catch (IOException e) {
+                    System.err.println("Failed to backup .gsheet file: " + source + " -> " + e.getMessage());
+                    return null;
+                }
+            }
+
             backupPath = destinationRoot.resolve(source.getFileName());
             try {
+                Files.createDirectories(backupPath.getParent());
                 Files.copy(source, backupPath, StandardCopyOption.REPLACE_EXISTING);
                 System.out.println("File backup completed successfully.");
                 return backupPath.toString();
             } catch (IOException e) {
+                // 🔧 fallback for Google Drive weirdness
+                if (source.toString().toLowerCase().endsWith(".gsheet")) {
+                    try {
+                        Path alt = destinationRoot.resolve(replaceGsheetExtension(source.getFileName().toString()));
+                        backupGoogleSheetFile(source, alt);
+                        return alt.toString();
+                    } catch (IOException ex) {
+                        System.err.println("Fallback .gsheet export failed: " + ex.getMessage());
+                    }
+                }
                 System.err.println("Failed to backup file: " + e.getMessage());
                 return null;
             }
         } else {
-            // Directory
             backupPath = destinationRoot.resolve(source.getFileName() + "_backup_" + System.currentTimeMillis());
 
+            AtomicBoolean hadErrors = new AtomicBoolean(false);
+
             try {
-                // Count total files
                 long totalFiles = Files.walk(source).filter(Files::isRegularFile).count();
                 System.out.println("Backing up " + totalFiles + " files...");
 
@@ -78,10 +105,33 @@ public class BackupEngine {
                         if (Files.isDirectory(path)) {
                             Files.createDirectories(target);
                         } else {
-                            Files.copy(path, target, StandardCopyOption.REPLACE_EXISTING);
+                            Files.createDirectories(target.getParent());
+
+                            try {
+                                if (isGoogleSheetsShortcut(path)) {
+                                    target = target.resolveSibling(replaceGsheetExtension(target.getFileName().toString()));
+                                    backupGoogleSheetFile(path, target);
+                                } else {
+                                    Files.copy(path, target, StandardCopyOption.REPLACE_EXISTING);
+                                }
+                            } catch (IOException copyError) {
+                                // 🔧 fallback handling
+                                if (path.toString().toLowerCase().endsWith(".gsheet")) {
+                                    try {
+                                        Path alt = target.resolveSibling(replaceGsheetExtension(target.getFileName().toString()));
+                                        backupGoogleSheetFile(path, alt);
+                                    } catch (IOException ex) {
+                                        hadErrors.set(true);
+                                        System.err.println("Failed to export .gsheet: " + path + " -> " + ex.getMessage());
+                                    }
+                                } else {
+                                    throw copyError;
+                                }
+                            }
                         }
 
                     } catch (IOException e) {
+                        hadErrors.set(true);
                         if (path.toString().toLowerCase().endsWith(".lock")) {
                             System.out.println("Skipping locked file: " + path);
                         } else {
@@ -90,7 +140,12 @@ public class BackupEngine {
                     }
                 });
 
-                System.out.println("Backup completed successfully.");
+                if (hadErrors.get()) {
+                    System.out.println("Backup completed with errors.");
+                } else {
+                    System.out.println("Backup completed successfully.");
+                }
+
                 return backupPath.toString();
 
             } catch (IOException e) {
@@ -100,11 +155,6 @@ public class BackupEngine {
         }
     }
 
-    /**
-     * Replaces the destination file with the source file. Both files must exist for the operation to succeed.
-     * @param sourceFile The path to the source file that will replace the destination file.
-     * @param destinationFile The path to the destination file that will be replaced.
-     */
     public void replaceFile(String sourceFile, String destinationFile) {
         Path source = Paths.get(sourceFile);
         Path destination = Paths.get(destinationFile);
@@ -118,7 +168,7 @@ public class BackupEngine {
             System.out.println("Destination file does not exist.");
             return;
         }
-        
+
         try {
             Files.copy(source, destination, StandardCopyOption.REPLACE_EXISTING);
             System.out.println("File " + sourceFile + " replaced " + destinationFile);
@@ -127,7 +177,194 @@ public class BackupEngine {
         }
     }
 
-    /**
+    // 🔧 improved detection
+    private boolean isGoogleSheetsShortcut(Path path) {
+        return path != null
+                && Files.isRegularFile(path)
+                && path.getFileName().toString().toLowerCase().endsWith(".gsheet");
+    }
+
+    private String replaceGsheetExtension(String fileName) {
+        if (fileName == null) {
+            return null;
+        }
+        return fileName.replaceAll("(?i)\\.gsheet$", ".xlsx");
+    }
+
+    private Path resolveSourcePathForBackup(Path sourceDir, Path backupFile, Path relative) {
+        Path sourceFile = sourceDir.resolve(relative);
+        if (Files.exists(sourceFile)) {
+            return sourceFile;
+        }
+
+        if (backupFile.toString().toLowerCase().endsWith(".xlsx")) {
+            Path alternateSource = sourceDir.resolve(relative.toString().replaceAll("(?i)\\.xlsx$", ".gsheet"));
+            if (Files.exists(alternateSource)) {
+                return alternateSource;
+            }
+        }
+
+        return sourceFile;
+    }
+
+    public static String extractGoogleSheetDocId(String content) {
+        if (content == null || content.trim().isEmpty()) {
+            return null;
+        }
+
+        try {
+            JSONObject json = new JSONObject(content.trim());
+            String docId = json.optString("doc_id", null);
+            if (docId == null || docId.isEmpty()) {
+                docId = json.optString("id", null);
+            }
+
+            if (docId == null || docId.isEmpty()) {
+                String url = json.optString("url", null);
+                if (url != null && !url.isBlank()) {
+                    docId = extractGoogleSheetDocIdFromUrl(url);
+                }
+            }
+
+            return (docId == null || docId.isEmpty()) ? null : docId;
+        } catch (JSONException e) {
+            return null;
+        }
+    }
+
+    private static String extractGoogleSheetDocIdFromUrl(String url) {
+        if (url == null || url.isBlank()) {
+            return null;
+        }
+
+        String normalized = url.trim();
+        int index = normalized.indexOf("/d/");
+        if (index >= 0) {
+            int start = index + 3;
+            int end = normalized.indexOf('/', start);
+            if (end < 0) {
+                end = normalized.length();
+            }
+            String candidate = normalized.substring(start, end);
+            if (!candidate.isBlank()) {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private String getGoogleAccessToken() throws IOException {
+        String token = System.getProperty("google.drive.access.token");
+        if (token != null && !token.isBlank()) {
+            return token.trim();
+        }
+        token = System.getenv("GOOGLE_DRIVE_ACCESS_TOKEN");
+        if (token != null && !token.isBlank()) {
+            return token.trim();
+        }
+
+        return authManager.getAccessToken();
+    }
+
+    private String requireGoogleAccessToken() throws IOException {
+        String accessToken = getGoogleAccessToken();
+        if (accessToken == null || accessToken.isBlank()) {
+            throw new IOException("Please authenticate with Google Drive.\nRun: backuptracker --login");
+        }
+        return accessToken;
+    }
+
+    private void backupGoogleSheetFile(Path source, Path target) throws IOException {
+        String docId = null;
+        try {
+            String json = Files.readString(source);
+            docId = extractGoogleSheetDocId(json);
+        } catch (IOException e) {
+            // fallback: search Drive API by filename
+            String fileName = source.getFileName().toString();
+            if (fileName.toLowerCase().endsWith(".gsheet")) {
+                fileName = fileName.substring(0, fileName.length() - 7); // remove .gsheet
+            }
+            docId = lookupDocIdByName(fileName);
+        }
+        if (docId == null) {
+            throw new IOException("Unable to extract or lookup doc_id for .gsheet file.");
+        }
+
+        System.out.println("Exporting Google Sheets document id: " + docId);
+        byte[] excelData = downloadGoogleSheetAsXlsx(docId);
+        Files.createDirectories(target.getParent());
+        Files.write(target, excelData);
+        System.out.println("Converted .gsheet to .xlsx: " + target);
+    }
+
+    private byte[] downloadGoogleSheetAsXlsx(String docId) throws IOException {
+        String accessToken = requireGoogleAccessToken();
+
+        String url = "https://www.googleapis.com/drive/v3/files/"
+            + URLEncoder.encode(docId, StandardCharsets.UTF_8)
+            + "/export?mimeType="
+            + URLEncoder.encode("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", StandardCharsets.UTF_8);
+
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .timeout(Duration.ofSeconds(60))
+            .header("Authorization", "Bearer " + accessToken)
+            .GET()
+            .build();
+
+        try {
+            HttpResponse<byte[]> response = HttpClient.newHttpClient()
+                .send(request, HttpResponse.BodyHandlers.ofByteArray());
+
+            if (response.statusCode() != 200) {
+                throw new IOException("Google export failed: " + response.statusCode());
+            }
+            return response.body();
+
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Request interrupted.", e);
+        }
+    }
+
+    private String lookupDocIdByName(String fileName) throws IOException {
+        String accessToken = requireGoogleAccessToken();
+
+        String query = "name='" + fileName.replace("'", "\\'") + "' and mimeType='application/vnd.google-apps.spreadsheet'";
+        String url = "https://www.googleapis.com/drive/v3/files?q=" + URLEncoder.encode(query, StandardCharsets.UTF_8);
+
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .timeout(Duration.ofSeconds(30))
+            .header("Authorization", "Bearer " + accessToken)
+            .GET()
+            .build();
+
+        try {
+            HttpResponse<String> response = HttpClient.newHttpClient()
+                .send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() != 200) {
+                throw new IOException("Drive API search failed: " + response.statusCode() + " " + response.body());
+            }
+
+            JSONObject json = new JSONObject(response.body());
+            JSONArray files = json.optJSONArray("files");
+            if (files != null && files.length() > 0) {
+                JSONObject file = files.getJSONObject(0);
+                return file.optString("id", null);
+            }
+            return null;
+
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Request interrupted.", e);
+        }
+    }
+
+        /**
      * Updates the backup for a tracked item.
      * @param type The type of the item ("file" or "directory").
      * @param sourcePath The source path.
@@ -151,9 +388,17 @@ public class BackupEngine {
                     System.err.println("Skipping update; source file cannot be read: " + sourcePath);
                     return;
                 }
-                String backupHash = hasher.hashFile(backupPath);
-                if (backupHash == null || !sourceHash.equals(backupHash)) {
-                    replaceFile(sourcePath, backupPath);
+                if (isGoogleSheetsShortcut(source)) {
+                    try {
+                        backupGoogleSheetFile(source, backup);
+                    } catch (IOException e) {
+                        System.err.println("Failed to update .gsheet file: " + sourcePath + " -> " + e.getMessage());
+                    }
+                } else {
+                    String backupHash = hasher.hashFile(backupPath);
+                    if (backupHash == null || !sourceHash.equals(backupHash)) {
+                        replaceFile(sourcePath, backupPath);
+                    }
                 }
             }
         } else if ("directory".equals(type)) {
@@ -174,13 +419,24 @@ public class BackupEngine {
                             System.err.println("Skipping locked or unreadable source file: " + sourceFile);
                             return;
                         }
-                        String backupHash = hasher.hashFile(backupFile.toString());
-                        if (!Files.exists(backupFile) || (backupHash != null && !sourceHash.equals(backupHash))) {
-                            Files.createDirectories(backupFile.getParent());
-                            Files.copy(sourceFile, backupFile, StandardCopyOption.REPLACE_EXISTING);
-                            System.out.println("Updated/Copied: " + relative);
-                        } else if (backupHash == null && Files.exists(backupFile)) {
-                            System.out.println("Skipping update for locked or unreadable backup file: " + backupFile);
+                        if (isGoogleSheetsShortcut(sourceFile)) {
+                            try {
+                                Path sheetBackupFile = backupFile.resolveSibling(replaceGsheetExtension(backupFile.getFileName().toString()));
+                                Files.createDirectories(sheetBackupFile.getParent());
+                                backupGoogleSheetFile(sourceFile, sheetBackupFile);
+                                System.out.println("Updated/Copied: " + relative);
+                            } catch (IOException e) {
+                                System.err.println("Failed to update .gsheet file: " + sourceFile + " -> " + e.getMessage());
+                            }
+                        } else {
+                            String backupHash = hasher.hashFile(backupFile.toString());
+                            if (!Files.exists(backupFile) || (backupHash != null && !sourceHash.equals(backupHash))) {
+                                Files.createDirectories(backupFile.getParent());
+                                Files.copy(sourceFile, backupFile, StandardCopyOption.REPLACE_EXISTING);
+                                System.out.println("Updated/Copied: " + relative);
+                            } else if (backupHash == null && Files.exists(backupFile)) {
+                                System.out.println("Skipping update for locked or unreadable backup file: " + backupFile);
+                            }
                         }
                     } catch (IOException e) {
                         if (sourceFile.toString().toLowerCase().endsWith(".lock")) {
@@ -199,7 +455,7 @@ public class BackupEngine {
                 Files.walk(backupDir).filter(Files::isRegularFile).forEach(backupFile -> {
                     try {
                         Path relative = backupDir.relativize(backupFile);
-                        Path sourceFile = sourceDir.resolve(relative);
+                        Path sourceFile = resolveSourcePathForBackup(sourceDir, backupFile, relative);
                         if (!Files.exists(sourceFile)) {
                             Files.delete(backupFile);
                             System.out.println("Deleted: " + relative);

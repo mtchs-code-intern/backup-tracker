@@ -76,6 +76,18 @@ class AppTest {
     }
 
     @Test
+    void ExtractGoogleSheetDocIdFromGsheetJson() {
+        String json = "{ \"doc_id\": \"1AbC123XYZ\" }";
+        assertEquals("1AbC123XYZ", BackupEngine.extractGoogleSheetDocId(json));
+    }
+
+    @Test
+    void ExtractGoogleSheetDocIdFromGsheetUrl() {
+        String json = "{ \"url\": \"https://docs.google.com/spreadsheets/d/1AbC123XYZ/edit\" }";
+        assertEquals("1AbC123XYZ", BackupEngine.extractGoogleSheetDocId(json));
+    }
+
+    @Test
     void BackupWithSourcePathThatIsAFile() throws IOException {
         BackupEngine backupEngine = new BackupEngine();
 

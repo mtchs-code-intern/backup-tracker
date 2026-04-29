@@ -13,7 +13,7 @@ import mtchs.backupTracker.backupEngine.FileHasher;
  * App is the main entry point for the Backup Tracker application.
  * 
  * @author Carsen Gafford
- * @version 1.1.5
+ * @version 1.2.0
  * @since 04-13-2026
  */
 public class App {
@@ -64,6 +64,11 @@ public class App {
                 printHelp();
                 break;
 
+            case "--login":
+            case "-login":
+                handleLogin(args);
+                break;
+
             default:
                 System.out.println("Invalid arguments. Use -help or -h for usage information.");
         }
@@ -74,7 +79,7 @@ public class App {
             System.out.println("Usage: -v | -version");
             return;
         }
-        System.out.println("Backup Tracker Version 1.1.5");
+        System.out.println("Backup Tracker Version 1.2.0");
     }
 
     private static void handleTrack(String[] args) {
@@ -192,6 +197,20 @@ public class App {
         }
     }
 
+    private static void handleLogin(String[] args) {
+        if (args.length != 1) {
+            System.out.println("Usage: --login");
+            return;
+        }
+
+        try {
+            GoogleDriveAuthManager authManager = new GoogleDriveAuthManager();
+            authManager.performLogin();
+        } catch (Exception e) {
+            System.err.println("Failed to complete Google Drive login: " + e.getMessage());
+        }
+    }
+
     private static void handleList(String[] args) {
         if (args.length != 1) {
             System.out.println("Usage: -list | -l");
@@ -253,6 +272,7 @@ public class App {
         System.out.println("  -list, -l                    List tracked items");
         System.out.println("  -stoptrack, -st <source>     Stop tracking one item");
         System.out.println("  -stoptrack, -st -all         Stop tracking all items");
+        System.out.println("  --login                      Authenticate with Google Drive");
         System.out.println("  -help, -h                    Show this help message");
     }
 
