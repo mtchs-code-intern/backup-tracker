@@ -382,23 +382,21 @@ public class BackupEngine {
                 } catch (IOException e) {
                     System.err.println("Failed to delete backup file: " + e.getMessage());
                 }
+            } else if (isGoogleSheetsShortcut(source)) {
+                try {
+                    backupGoogleSheetFile(source, backup);
+                } catch (IOException e) {
+                    System.err.println("Failed to update .gsheet file: " + sourcePath + " -> " + e.getMessage());
+                }
             } else {
                 String sourceHash = hasher.hashFile(sourcePath);
                 if (sourceHash == null) {
                     System.err.println("Skipping update; source file cannot be read: " + sourcePath);
                     return;
                 }
-                if (isGoogleSheetsShortcut(source)) {
-                    try {
-                        backupGoogleSheetFile(source, backup);
-                    } catch (IOException e) {
-                        System.err.println("Failed to update .gsheet file: " + sourcePath + " -> " + e.getMessage());
-                    }
-                } else {
-                    String backupHash = hasher.hashFile(backupPath);
-                    if (backupHash == null || !sourceHash.equals(backupHash)) {
-                        replaceFile(sourcePath, backupPath);
-                    }
+                String backupHash = hasher.hashFile(backupPath);
+                if (backupHash == null || !sourceHash.equals(backupHash)) {
+                    replaceFile(sourcePath, backupPath);
                 }
             }
         } else if ("directory".equals(type)) {
@@ -414,11 +412,6 @@ public class BackupEngine {
                     try {
                         Path relative = sourceDir.relativize(sourceFile);
                         Path backupFile = backupDir.resolve(relative);
-                        String sourceHash = hasher.hashFile(sourceFile.toString());
-                        if (sourceHash == null) {
-                            System.err.println("Skipping locked or unreadable source file: " + sourceFile);
-                            return;
-                        }
                         if (isGoogleSheetsShortcut(sourceFile)) {
                             try {
                                 Path sheetBackupFile = backupFile.resolveSibling(replaceGsheetExtension(backupFile.getFileName().toString()));
@@ -428,15 +421,22 @@ public class BackupEngine {
                             } catch (IOException e) {
                                 System.err.println("Failed to update .gsheet file: " + sourceFile + " -> " + e.getMessage());
                             }
-                        } else {
-                            String backupHash = hasher.hashFile(backupFile.toString());
-                            if (!Files.exists(backupFile) || (backupHash != null && !sourceHash.equals(backupHash))) {
-                                Files.createDirectories(backupFile.getParent());
-                                Files.copy(sourceFile, backupFile, StandardCopyOption.REPLACE_EXISTING);
-                                System.out.println("Updated/Copied: " + relative);
-                            } else if (backupHash == null && Files.exists(backupFile)) {
-                                System.out.println("Skipping update for locked or unreadable backup file: " + backupFile);
-                            }
+                            return;
+                        }
+
+                        String sourceHash = hasher.hashFile(sourceFile.toString());
+                        if (sourceHash == null) {
+                            System.err.println("Skipping locked or unreadable source file: " + sourceFile);
+                            return;
+                        }
+
+                        String backupHash = hasher.hashFile(backupFile.toString());
+                        if (!Files.exists(backupFile) || (backupHash != null && !sourceHash.equals(backupHash))) {
+                            Files.createDirectories(backupFile.getParent());
+                            Files.copy(sourceFile, backupFile, StandardCopyOption.REPLACE_EXISTING);
+                            System.out.println("Updated/Copied: " + relative);
+                        } else if (backupHash == null && Files.exists(backupFile)) {
+                            System.out.println("Skipping update for locked or unreadable backup file: " + backupFile);
                         }
                     } catch (IOException e) {
                         if (sourceFile.toString().toLowerCase().endsWith(".lock")) {
