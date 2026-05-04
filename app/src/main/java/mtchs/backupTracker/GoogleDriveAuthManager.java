@@ -311,7 +311,6 @@ public class GoogleDriveAuthManager {
                 }
             }
         } catch (Exception ignored) {
-            // ignore invalid or unreadable auth file and recreate it
         }
         authData = new JSONObject();
     }

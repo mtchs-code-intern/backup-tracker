@@ -67,6 +67,26 @@ public class BackupEngine {
                     System.err.println("Failed to backup .gsheet file: " + source + " -> " + e.getMessage());
                     return null;
                 }
+            } else if (isGoogleDocsShortcut(source)) {
+                backupPath = destinationRoot.resolve(replaceGdocExtension(source.getFileName().toString()));
+                try {
+                    backupGoogleDocFile(source, backupPath);
+                    System.out.println("Converted and backed up .gdoc successfully.");
+                    return backupPath.toString();
+                } catch (IOException e) {
+                    System.err.println("Failed to backup .gdoc file: " + source + " -> " + e.getMessage());
+                    return null;
+                }
+            } else if (isGoogleSlidesShortcut(source)) {
+                backupPath = destinationRoot.resolve(replaceGslidesExtension(source.getFileName().toString()));
+                try {
+                    backupGoogleSlidesFile(source, backupPath);
+                    System.out.println("Converted and backed up .gslides successfully.");
+                    return backupPath.toString();
+                } catch (IOException e) {
+                    System.err.println("Failed to backup .gslides file: " + source + " -> " + e.getMessage());
+                    return null;
+                }
             }
 
             backupPath = destinationRoot.resolve(source.getFileName());
@@ -76,7 +96,6 @@ public class BackupEngine {
                 System.out.println("File backup completed successfully.");
                 return backupPath.toString();
             } catch (IOException e) {
-                // 🔧 fallback for Google Drive weirdness
                 if (source.toString().toLowerCase().endsWith(".gsheet")) {
                     try {
                         Path alt = destinationRoot.resolve(replaceGsheetExtension(source.getFileName().toString()));
@@ -84,6 +103,22 @@ public class BackupEngine {
                         return alt.toString();
                     } catch (IOException ex) {
                         System.err.println("Fallback .gsheet export failed: " + ex.getMessage());
+                    }
+                } else if (source.toString().toLowerCase().endsWith(".gdoc")) {
+                    try {
+                        Path alt = destinationRoot.resolve(replaceGdocExtension(source.getFileName().toString()));
+                        backupGoogleDocFile(source, alt);
+                        return alt.toString();
+                    } catch (IOException ex) {
+                        System.err.println("Fallback .gdoc export failed: " + ex.getMessage());
+                    }
+                } else if (source.toString().toLowerCase().endsWith(".gslides")) {
+                    try {
+                        Path alt = destinationRoot.resolve(replaceGslidesExtension(source.getFileName().toString()));
+                        backupGoogleSlidesFile(source, alt);
+                        return alt.toString();
+                    } catch (IOException ex) {
+                        System.err.println("Fallback .gslides export failed: " + ex.getMessage());
                     }
                 }
                 System.err.println("Failed to backup file: " + e.getMessage());
@@ -111,11 +146,16 @@ public class BackupEngine {
                                 if (isGoogleSheetsShortcut(path)) {
                                     target = target.resolveSibling(replaceGsheetExtension(target.getFileName().toString()));
                                     backupGoogleSheetFile(path, target);
+                                } else if (isGoogleDocsShortcut(path)) {
+                                    target = target.resolveSibling(replaceGdocExtension(target.getFileName().toString()));
+                                    backupGoogleDocFile(path, target);
+                                } else if (isGoogleSlidesShortcut(path)) {
+                                    target = target.resolveSibling(replaceGslidesExtension(target.getFileName().toString()));
+                                    backupGoogleSlidesFile(path, target);
                                 } else {
                                     Files.copy(path, target, StandardCopyOption.REPLACE_EXISTING);
                                 }
                             } catch (IOException copyError) {
-                                // 🔧 fallback handling
                                 if (path.toString().toLowerCase().endsWith(".gsheet")) {
                                     try {
                                         Path alt = target.resolveSibling(replaceGsheetExtension(target.getFileName().toString()));
@@ -123,6 +163,22 @@ public class BackupEngine {
                                     } catch (IOException ex) {
                                         hadErrors.set(true);
                                         System.err.println("Failed to export .gsheet: " + path + " -> " + ex.getMessage());
+                                    }
+                                } else if (path.toString().toLowerCase().endsWith(".gdoc")) {
+                                    try {
+                                        Path alt = target.resolveSibling(replaceGdocExtension(target.getFileName().toString()));
+                                        backupGoogleDocFile(path, alt);
+                                    } catch (IOException ex) {
+                                        hadErrors.set(true);
+                                        System.err.println("Failed to export .gdoc: " + path + " -> " + ex.getMessage());
+                                    }
+                                } else if (path.toString().toLowerCase().endsWith(".gslides")) {
+                                    try {
+                                        Path alt = target.resolveSibling(replaceGslidesExtension(target.getFileName().toString()));
+                                        backupGoogleSlidesFile(path, alt);
+                                    } catch (IOException ex) {
+                                        hadErrors.set(true);
+                                        System.err.println("Failed to export .gslides: " + path + " -> " + ex.getMessage());
                                     }
                                 } else {
                                     throw copyError;
@@ -177,11 +233,22 @@ public class BackupEngine {
         }
     }
 
-    // 🔧 improved detection
     private boolean isGoogleSheetsShortcut(Path path) {
         return path != null
                 && Files.isRegularFile(path)
                 && path.getFileName().toString().toLowerCase().endsWith(".gsheet");
+    }
+
+    private boolean isGoogleDocsShortcut(Path path) {
+        return path != null
+                && Files.isRegularFile(path)
+                && path.getFileName().toString().toLowerCase().endsWith(".gdoc");
+    }
+
+    private boolean isGoogleSlidesShortcut(Path path) {
+        return path != null
+                && Files.isRegularFile(path)
+                && path.getFileName().toString().toLowerCase().endsWith(".gslides");
     }
 
     private String replaceGsheetExtension(String fileName) {
@@ -189,6 +256,20 @@ public class BackupEngine {
             return null;
         }
         return fileName.replaceAll("(?i)\\.gsheet$", ".xlsx");
+    }
+
+    private String replaceGdocExtension(String fileName) {
+        if (fileName == null) {
+            return null;
+        }
+        return fileName.replaceAll("(?i)\\.gdoc$", ".docx");
+    }
+
+    private String replaceGslidesExtension(String fileName) {
+        if (fileName == null) {
+            return null;
+        }
+        return fileName.replaceAll("(?i)\\.gslides$", ".pptx");
     }
 
     private Path resolveSourcePathForBackup(Path sourceDir, Path backupFile, Path relative) {
@@ -199,6 +280,20 @@ public class BackupEngine {
 
         if (backupFile.toString().toLowerCase().endsWith(".xlsx")) {
             Path alternateSource = sourceDir.resolve(relative.toString().replaceAll("(?i)\\.xlsx$", ".gsheet"));
+            if (Files.exists(alternateSource)) {
+                return alternateSource;
+            }
+        }
+
+        if (backupFile.toString().toLowerCase().endsWith(".docx")) {
+            Path alternateSource = sourceDir.resolve(relative.toString().replaceAll("(?i)\\.docx$", ".gdoc"));
+            if (Files.exists(alternateSource)) {
+                return alternateSource;
+            }
+        }
+
+        if (backupFile.toString().toLowerCase().endsWith(".pptx")) {
+            Path alternateSource = sourceDir.resolve(relative.toString().replaceAll("(?i)\\.pptx$", ".gslides"));
             if (Files.exists(alternateSource)) {
                 return alternateSource;
             }
@@ -281,7 +376,6 @@ public class BackupEngine {
             String json = Files.readString(source);
             docId = extractGoogleSheetDocId(json);
         } catch (IOException e) {
-            // fallback: search Drive API by filename
             String fileName = source.getFileName().toString();
             if (fileName.toLowerCase().endsWith(".gsheet")) {
                 fileName = fileName.substring(0, fileName.length() - 7); // remove .gsheet
@@ -299,6 +393,52 @@ public class BackupEngine {
         System.out.println("Converted .gsheet to .xlsx: " + target);
     }
 
+    private void backupGoogleDocFile(Path source, Path target) throws IOException {
+        String docId = null;
+        try {
+            String json = Files.readString(source);
+            docId = extractGoogleSheetDocId(json);
+        } catch (IOException e) {
+            String fileName = source.getFileName().toString();
+            if (fileName.toLowerCase().endsWith(".gdoc")) {
+                fileName = fileName.substring(0, fileName.length() - 5);
+            }
+            docId = lookupDocIdByNameAndType(fileName, "application/vnd.google-apps.document");
+        }
+        if (docId == null) {
+            throw new IOException("Unable to extract or lookup doc_id for .gdoc file.");
+        }
+
+        System.out.println("Exporting Google Docs document id: " + docId);
+        byte[] docxData = downloadGoogleDocAsDocx(docId);
+        Files.createDirectories(target.getParent());
+        Files.write(target, docxData);
+        System.out.println("Converted .gdoc to .docx: " + target);
+    }
+
+    private void backupGoogleSlidesFile(Path source, Path target) throws IOException {
+        String docId = null;
+        try {
+            String json = Files.readString(source);
+            docId = extractGoogleSheetDocId(json);
+        } catch (IOException e) {
+            String fileName = source.getFileName().toString();
+            if (fileName.toLowerCase().endsWith(".gslides")) {
+                fileName = fileName.substring(0, fileName.length() - 8);
+            }
+            docId = lookupDocIdByNameAndType(fileName, "application/vnd.google-apps.presentation");
+        }
+        if (docId == null) {
+            throw new IOException("Unable to extract or lookup doc_id for .gslides file.");
+        }
+
+        System.out.println("Exporting Google Slides document id: " + docId);
+        byte[] pptxData = downloadGoogleSlidesAsPptx(docId);
+        Files.createDirectories(target.getParent());
+        Files.write(target, pptxData);
+        System.out.println("Converted .gslides to .pptx: " + target);
+    }
+
     private byte[] downloadGoogleSheetAsXlsx(String docId) throws IOException {
         String accessToken = requireGoogleAccessToken();
 
@@ -306,6 +446,66 @@ public class BackupEngine {
             + URLEncoder.encode(docId, StandardCharsets.UTF_8)
             + "/export?mimeType="
             + URLEncoder.encode("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", StandardCharsets.UTF_8);
+
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .timeout(Duration.ofSeconds(60))
+            .header("Authorization", "Bearer " + accessToken)
+            .GET()
+            .build();
+
+        try {
+            HttpResponse<byte[]> response = HttpClient.newHttpClient()
+                .send(request, HttpResponse.BodyHandlers.ofByteArray());
+
+            if (response.statusCode() != 200) {
+                throw new IOException("Google export failed: " + response.statusCode());
+            }
+            return response.body();
+
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Request interrupted.", e);
+        }
+    }
+
+    private byte[] downloadGoogleDocAsDocx(String docId) throws IOException {
+        String accessToken = requireGoogleAccessToken();
+
+        String url = "https://www.googleapis.com/drive/v3/files/"
+            + URLEncoder.encode(docId, StandardCharsets.UTF_8)
+            + "/export?mimeType="
+            + URLEncoder.encode("application/vnd.openxmlformats-officedocument.wordprocessingml.document", StandardCharsets.UTF_8);
+
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .timeout(Duration.ofSeconds(60))
+            .header("Authorization", "Bearer " + accessToken)
+            .GET()
+            .build();
+
+        try {
+            HttpResponse<byte[]> response = HttpClient.newHttpClient()
+                .send(request, HttpResponse.BodyHandlers.ofByteArray());
+
+            if (response.statusCode() != 200) {
+                throw new IOException("Google export failed: " + response.statusCode());
+            }
+            return response.body();
+
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Request interrupted.", e);
+        }
+    }
+
+    private byte[] downloadGoogleSlidesAsPptx(String docId) throws IOException {
+        String accessToken = requireGoogleAccessToken();
+
+        String url = "https://www.googleapis.com/drive/v3/files/"
+            + URLEncoder.encode(docId, StandardCharsets.UTF_8)
+            + "/export?mimeType="
+            + URLEncoder.encode("application/vnd.openxmlformats-officedocument.presentationml.presentation", StandardCharsets.UTF_8);
 
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create(url))
@@ -364,14 +564,42 @@ public class BackupEngine {
         }
     }
 
-        /**
-     * Updates the backup for a tracked item.
-     * @param type The type of the item ("file" or "directory").
-     * @param sourcePath The source path.
-     * @param backupPath The backup path.
-     * @param hasher The FileHasher instance.
-     */
-    public void updateBackup(String type, String sourcePath, String backupPath, FileHasher hasher) {
+    private String lookupDocIdByNameAndType(String fileName, String mimeType) throws IOException {
+        String accessToken = requireGoogleAccessToken();
+
+        String query = "name='" + fileName.replace("'", "\\'") + "' and mimeType='" + mimeType + "'";
+        String url = "https://www.googleapis.com/drive/v3/files?q=" + URLEncoder.encode(query, StandardCharsets.UTF_8);
+
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .timeout(Duration.ofSeconds(30))
+            .header("Authorization", "Bearer " + accessToken)
+            .GET()
+            .build();
+
+        try {
+            HttpResponse<String> response = HttpClient.newHttpClient()
+                .send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() != 200) {
+                throw new IOException("Drive API search failed: " + response.statusCode() + " " + response.body());
+            }
+
+            JSONObject json = new JSONObject(response.body());
+            JSONArray files = json.optJSONArray("files");
+            if (files != null && files.length() > 0) {
+                JSONObject file = files.getJSONObject(0);
+                return file.optString("id", null);
+            }
+            return null;
+
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Request interrupted.", e);
+        }
+    }
+
+        public void updateBackup(String type, String sourcePath, String backupPath, FileHasher hasher) {
         if ("file".equals(type)) {
             Path source = Paths.get(sourcePath);
             Path backup = Paths.get(backupPath);
@@ -388,6 +616,18 @@ public class BackupEngine {
                 } catch (IOException e) {
                     System.err.println("Failed to update .gsheet file: " + sourcePath + " -> " + e.getMessage());
                 }
+            } else if (isGoogleDocsShortcut(source)) {
+                try {
+                    backupGoogleDocFile(source, backup);
+                } catch (IOException e) {
+                    System.err.println("Failed to update .gdoc file: " + sourcePath + " -> " + e.getMessage());
+                }
+            } else if (isGoogleSlidesShortcut(source)) {
+                try {
+                    backupGoogleSlidesFile(source, backup);
+                } catch (IOException e) {
+                    System.err.println("Failed to update .gslides file: " + sourcePath + " -> " + e.getMessage());
+                }
             } else {
                 String sourceHash = hasher.hashFile(sourcePath);
                 if (sourceHash == null) {
@@ -403,11 +643,9 @@ public class BackupEngine {
             Path sourceDir = Paths.get(sourcePath);
             Path backupDir = Paths.get(backupPath);
             try {
-                // Count total source files for progress
                 long totalSourceFiles = Files.walk(sourceDir).filter(Files::isRegularFile).count();
                 System.out.println("Updating " + totalSourceFiles + " source files...");
 
-                // Update/add files
                 Files.walk(sourceDir).filter(Files::isRegularFile).forEach(sourceFile -> {
                     try {
                         Path relative = sourceDir.relativize(sourceFile);
@@ -420,6 +658,30 @@ public class BackupEngine {
                                 System.out.println("Updated/Copied: " + relative);
                             } catch (IOException e) {
                                 System.err.println("Failed to update .gsheet file: " + sourceFile + " -> " + e.getMessage());
+                            }
+                            return;
+                        }
+
+                        if (isGoogleDocsShortcut(sourceFile)) {
+                            try {
+                                Path docBackupFile = backupFile.resolveSibling(replaceGdocExtension(backupFile.getFileName().toString()));
+                                Files.createDirectories(docBackupFile.getParent());
+                                backupGoogleDocFile(sourceFile, docBackupFile);
+                                System.out.println("Updated/Copied: " + relative);
+                            } catch (IOException e) {
+                                System.err.println("Failed to update .gdoc file: " + sourceFile + " -> " + e.getMessage());
+                            }
+                            return;
+                        }
+
+                        if (isGoogleSlidesShortcut(sourceFile)) {
+                            try {
+                                Path slidesBackupFile = backupFile.resolveSibling(replaceGslidesExtension(backupFile.getFileName().toString()));
+                                Files.createDirectories(slidesBackupFile.getParent());
+                                backupGoogleSlidesFile(sourceFile, slidesBackupFile);
+                                System.out.println("Updated/Copied: " + relative);
+                            } catch (IOException e) {
+                                System.err.println("Failed to update .gslides file: " + sourceFile + " -> " + e.getMessage());
                             }
                             return;
                         }
@@ -448,10 +710,8 @@ public class BackupEngine {
                 });
 
                 System.out.println("Checking for deleted files...");
-                // Count total backup files for progress
                 long totalBackupFiles = Files.walk(backupDir).filter(Files::isRegularFile).count();
 
-                // Remove deleted files
                 Files.walk(backupDir).filter(Files::isRegularFile).forEach(backupFile -> {
                     try {
                         Path relative = backupDir.relativize(backupFile);

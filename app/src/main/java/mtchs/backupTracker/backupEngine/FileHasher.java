@@ -44,7 +44,6 @@ public class FileHasher {
                 digest.update(buffer, 0, bytesRead);
             }
         } catch (IOException e) {
-            // Silently return null for unreadable files (e.g., locked files)
             return null;
         }
 
