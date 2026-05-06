@@ -59,6 +59,7 @@ public class LocalTracker {
             folderObj.put("type", "directory");
             folderObj.put("sourcePath", sourcePath);
             folderObj.put("backupPath", JSONObject.NULL);
+            folderObj.put("noDelete", false);
 
             trackedItems.put(folderObj);
             saveTrackedItems(trackedItems);
@@ -119,6 +120,7 @@ public class LocalTracker {
             fileObj.put("sourcePath", sourcePath);
             fileObj.put("backupPath", JSONObject.NULL);
             fileObj.put("hash", hash);
+            fileObj.put("noDelete", false);
             
             JSONArray trackedFiles;
             
@@ -228,6 +230,51 @@ public class LocalTracker {
             e.printStackTrace();
         }
     }
+
+    public boolean setNoDelete(String sourcePath, boolean noDelete) {
+        try {
+            if (!Files.exists(JSON_FILE)) {
+                System.out.println("No items are currently being tracked.");
+                return false;
+            }
+
+            String content = Files.readString(JSON_FILE).trim();
+            if (content.isEmpty()) {
+                System.out.println("No items are currently being tracked.");
+                return false;
+            }
+
+            JSONArray trackedItems = new JSONArray(content);
+            Path source = Paths.get(sourcePath).toAbsolutePath().normalize();
+            JSONArray updatedTrackedItems = new JSONArray();
+            boolean found = false;
+
+            for (int i = 0; i < trackedItems.length(); i++) {
+                JSONObject trackedItem = trackedItems.getJSONObject(i);
+                String trackedSource = trackedItem.getString("sourcePath");
+                Path trackedPath = Paths.get(trackedSource).toAbsolutePath().normalize();
+
+                if (trackedPath.equals(source)) {
+                    trackedItem.put("noDelete", noDelete);
+                    found = true;
+                }
+
+                updatedTrackedItems.put(trackedItem);
+            }
+
+            if (!found) {
+                System.out.println("No tracked item found with source path: " + sourcePath);
+                return false;
+            }
+
+            Files.writeString(JSON_FILE, updatedTrackedItems.toString(4));
+            return true;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
     public void untrackFile(File file) {
         try {
             if (!Files.exists(JSON_FILE)) {

@@ -599,16 +599,20 @@ public class BackupEngine {
         }
     }
 
-        public void updateBackup(String type, String sourcePath, String backupPath, FileHasher hasher) {
+        public void updateBackup(String type, String sourcePath, String backupPath, FileHasher hasher, boolean noDelete) {
         if ("file".equals(type)) {
             Path source = Paths.get(sourcePath);
             Path backup = Paths.get(backupPath);
             if (!Files.exists(source)) {
-                try {
-                    Files.deleteIfExists(backup);
-                    System.out.println("Deleted backup file: " + backupPath);
-                } catch (IOException e) {
-                    System.err.println("Failed to delete backup file: " + e.getMessage());
+                if (noDelete) {
+                    System.out.println("Preserving deleted source backup file: " + backupPath);
+                } else {
+                    try {
+                        Files.deleteIfExists(backup);
+                        System.out.println("Deleted backup file: " + backupPath);
+                    } catch (IOException e) {
+                        System.err.println("Failed to delete backup file: " + e.getMessage());
+                    }
                 }
             } else if (isGoogleSheetsShortcut(source)) {
                 try {
@@ -717,8 +721,12 @@ public class BackupEngine {
                         Path relative = backupDir.relativize(backupFile);
                         Path sourceFile = resolveSourcePathForBackup(sourceDir, backupFile, relative);
                         if (!Files.exists(sourceFile)) {
-                            Files.delete(backupFile);
-                            System.out.println("Deleted: " + relative);
+                            if (noDelete) {
+                                System.out.println("Preserving deleted source backup file: " + relative);
+                            } else {
+                                Files.delete(backupFile);
+                                System.out.println("Deleted: " + relative);
+                            }
                         }
                     } catch (IOException e) {
                         System.err.println("Failed to delete: " + backupFile + " -> " + e.getMessage());

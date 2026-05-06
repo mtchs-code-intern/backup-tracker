@@ -13,7 +13,7 @@ import mtchs.backupTracker.backupEngine.FileHasher;
  * App is the main entry point for the Backup Tracker application.
  * 
  * @author Carsen Gafford
- * @version 1.2.2
+ * @version 1.3.0
  * @since 04-13-2026
  */
 public class App {
@@ -54,6 +54,11 @@ public class App {
                 handleList(args);
                 break;
 
+            case "-no-delete":
+            case "-nd":
+                handleNoDelete(args);
+                break;
+
             case "-stoptrack":
             case "-st":
                 handleStopTrack(args);
@@ -79,7 +84,7 @@ public class App {
             System.out.println("Usage: -v | -version");
             return;
         }
-        System.out.println("Backup Tracker Version 1.2.2");
+        System.out.println("Backup Tracker Version 1.3.0");
     }
 
     private static void handleTrack(String[] args) {
@@ -133,8 +138,9 @@ public class App {
 
                 String backupPath = item.getString("backupPath");
 
+                boolean noDelete = item.optBoolean("noDelete", false);
                 System.out.println("Updating item " + (i + 1) + "/" + trackedItems.length() + ": " + sourcePath);
-                backupEngine.updateBackup(type, sourcePath, backupPath, hasher);
+                backupEngine.updateBackup(type, sourcePath, backupPath, hasher, noDelete);
 
                 int percent = (int) (((i + 1) * 100) / trackedItems.length());
                 System.out.print("\rUpdating backups... [" + percent + "%]");
@@ -171,9 +177,10 @@ public class App {
 
             String type = itemToUpdate.getString("type");
             String backupPath = itemToUpdate.getString("backupPath");
+            boolean noDelete = itemToUpdate.optBoolean("noDelete", false);
 
             System.out.println("Updating item: " + sourcePath);
-            backupEngine.updateBackup(type, sourcePath, backupPath, hasher);
+            backupEngine.updateBackup(type, sourcePath, backupPath, hasher, noDelete);
             System.out.println("Update completed for: " + sourcePath);
             return;
         }
@@ -234,8 +241,23 @@ public class App {
             String backupPath = item.isNull("backupPath")
                     ? "No backup path set"
                     : item.getString("backupPath");
+            boolean noDelete = item.optBoolean("noDelete", false);
+            String noDeleteText = noDelete ? " [preserve deleted destination files]" : "";
 
-            System.out.println((i + 1) + ". [" + type + "] " + sourcePath + " -> " + backupPath);
+            System.out.println((i + 1) + ". [" + type + "] " + sourcePath + " -> " + backupPath + noDeleteText);
+        }
+    }
+
+    private static void handleNoDelete(String[] args) {
+        if (args.length != 2) {
+            System.out.println("Usage: -no-delete | -nd <source>");
+            return;
+        }
+
+        String sourcePath = normalizePath(args[1]);
+        LocalTracker tracker = new LocalTracker();
+        if (tracker.setNoDelete(sourcePath, true)) {
+            System.out.println("Marked tracked item to preserve deleted destination files: " + sourcePath);
         }
     }
 
@@ -270,6 +292,7 @@ public class App {
         System.out.println("  -update, -u [source]         Update all or one tracked item");
         System.out.println("  -backup, -b <source> <dest>  Perform a backup");
         System.out.println("  -list, -l                    List tracked items");
+        System.out.println("  -no-delete, -nd <source>     Mark a tracked item to preserve destination files");
         System.out.println("  -stoptrack, -st <source>     Stop tracking one item");
         System.out.println("  -stoptrack, -st -all         Stop tracking all items");
         System.out.println("  --login                      Authenticate with Google Drive");
