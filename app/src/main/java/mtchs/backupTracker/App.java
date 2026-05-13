@@ -13,7 +13,7 @@ import mtchs.backupTracker.backupEngine.FileHasher;
  * App is the main entry point for the Backup Tracker application.
  * 
  * @author Carsen Gafford
- * @version 1.3.0
+ * @version 1.3.1
  * @since 04-13-2026
  */
 public class App {
@@ -84,7 +84,7 @@ public class App {
             System.out.println("Usage: -v | -version");
             return;
         }
-        System.out.println("Backup Tracker Version 1.3.0");
+        System.out.println("Backup Tracker Version 1.3.1");
     }
 
     private static void handleTrack(String[] args) {
