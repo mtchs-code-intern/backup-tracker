@@ -22,12 +22,12 @@ import mtchs.backupTracker.backupEngine.FileHasher;
  * App is the main entry point for the Backup Tracker application.
  * 
  * @author Carsen Gafford
- * @version 1.4.0
+ * @version 1.4.1
  * @since 04-13-2026
  */
 public class App {
 
-    private static final String APP_VERSION = "1.4.0";
+    private static final String APP_VERSION = "1.4.1";
     private static final String GITHUB_LATEST_RELEASE_URL = "https://api.github.com/repos/mtchs-code-intern/backup-tracker/releases/latest";
     private static final String USER_AGENT = "BackupTrackerApp";
 
@@ -288,7 +288,8 @@ public class App {
     }
 
     private static String fetchLatestReleaseVersion() throws IOException {
-        HttpURLConnection connection = (HttpURLConnection) new URL(GITHUB_LATEST_RELEASE_URL).openConnection();
+        URL url = URI.create(GITHUB_LATEST_RELEASE_URL).toURL();
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         connection.setRequestMethod("GET");
         connection.setRequestProperty("User-Agent", USER_AGENT);
         connection.setRequestProperty("Accept", "application/vnd.github+json");

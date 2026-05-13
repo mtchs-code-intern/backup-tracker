@@ -403,7 +403,7 @@ public class BackupEngine {
             if (fileName.toLowerCase().endsWith(".gdoc")) {
                 fileName = fileName.substring(0, fileName.length() - 5);
             }
-            docId = lookupDocIdByNameAndType(fileName, "application/vnd.google-apps.document");
+            docId = lookupDocIdByName(fileName);
         }
         if (docId == null) {
             throw new IOException("Unable to extract or lookup doc_id for .gdoc file.");
@@ -426,7 +426,7 @@ public class BackupEngine {
             if (fileName.toLowerCase().endsWith(".gslides")) {
                 fileName = fileName.substring(0, fileName.length() - 8);
             }
-            docId = lookupDocIdByNameAndType(fileName, "application/vnd.google-apps.presentation");
+            docId = lookupDocIdByName(fileName);
         }
         if (docId == null) {
             throw new IOException("Unable to extract or lookup doc_id for .gslides file.");
@@ -532,8 +532,12 @@ public class BackupEngine {
     private String lookupDocIdByName(String fileName) throws IOException {
         String accessToken = requireGoogleAccessToken();
 
-        String query = "name='" + fileName.replace("'", "\\'") + "' and mimeType='application/vnd.google-apps.spreadsheet'";
-        String url = "https://www.googleapis.com/drive/v3/files?q=" + URLEncoder.encode(query, StandardCharsets.UTF_8);
+        String query = "name contains '" + fileName.replace("'", "\\'") + "' and trashed = false";
+
+        String url = "https://www.googleapis.com/drive/v3/files"
+            + "?q=" + URLEncoder.encode(query, StandardCharsets.UTF_8)
+            + "&fields=" + URLEncoder.encode("files(id,name,mimeType,createdTime,modifiedTime)", StandardCharsets.UTF_8)
+            + "&spaces=drive";
 
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create(url))
@@ -552,46 +556,21 @@ public class BackupEngine {
 
             JSONObject json = new JSONObject(response.body());
             JSONArray files = json.optJSONArray("files");
-            if (files != null && files.length() > 0) {
-                JSONObject file = files.getJSONObject(0);
-                return file.optString("id", null);
-            }
-            return null;
 
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IOException("Request interrupted.", e);
-        }
-    }
-
-    private String lookupDocIdByNameAndType(String fileName, String mimeType) throws IOException {
-        String accessToken = requireGoogleAccessToken();
-
-        String query = "name='" + fileName.replace("'", "\\'") + "' and mimeType='" + mimeType + "'";
-        String url = "https://www.googleapis.com/drive/v3/files?q=" + URLEncoder.encode(query, StandardCharsets.UTF_8);
-
-        HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(url))
-            .timeout(Duration.ofSeconds(30))
-            .header("Authorization", "Bearer " + accessToken)
-            .GET()
-            .build();
-
-        try {
-            HttpResponse<String> response = HttpClient.newHttpClient()
-                .send(request, HttpResponse.BodyHandlers.ofString());
-
-            if (response.statusCode() != 200) {
-                throw new IOException("Drive API search failed: " + response.statusCode() + " " + response.body());
+            if (files == null || files.length() == 0) {
+                return null;
             }
 
-            JSONObject json = new JSONObject(response.body());
-            JSONArray files = json.optJSONArray("files");
-            if (files != null && files.length() > 0) {
-                JSONObject file = files.getJSONObject(0);
-                return file.optString("id", null);
+            // Prefer exact match first
+            for (int i = 0; i < files.length(); i++) {
+                JSONObject file = files.getJSONObject(i);
+                if (fileName.equals(file.optString("name"))) {
+                    return file.optString("id", null);
+                }
             }
-            return null;
+
+            // fallback: first result
+            return files.getJSONObject(0).optString("id", null);
 
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -714,7 +693,6 @@ public class BackupEngine {
                 });
 
                 System.out.println("Checking for deleted files...");
-                long totalBackupFiles = Files.walk(backupDir).filter(Files::isRegularFile).count();
 
                 Files.walk(backupDir).filter(Files::isRegularFile).forEach(backupFile -> {
                     try {
