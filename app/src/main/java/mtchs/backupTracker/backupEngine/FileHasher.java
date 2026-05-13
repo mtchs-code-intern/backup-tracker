@@ -35,6 +35,11 @@ public class FileHasher {
             digest = MessageDigest.getInstance("SHA-256");
         } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
+            return null;
+        }
+
+        if (digest == null) {
+            return null;
         }
 
         try (InputStream fis = Files.newInputStream(Paths.get(filePath))) {
